@@ -475,10 +475,10 @@ public:
                 return {{LocationTypeX, index}};
             } else {
                 const auto emptyFunc = findEmptyFunc(snapshot);
-                if (emptyFunc.has_value()) {
-                const Coord2& funcCoord = emptyFunc.value();
-                const unsigned int blockInCoord = 0;
-                const Coord3 location = Coord3(funcCoord.x, funcCoord.y, blockInCoord);
+                if (emptyFunc) {
+                    const Coord2& funcCoord = *emptyFunc;
+                    const unsigned int inFieldCoord = 0;
+                    const Coord3 location = Coord3(funcCoord.x, funcCoord.y, inFieldCoord);
                     return {{LocationTypeFunc, location}};
                 } else {
                     return std::nullopt;
