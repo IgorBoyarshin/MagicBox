@@ -6,7 +6,8 @@ classFiles =
 justHeaderFiles =
 # Compilation flags
 OPTIMIZATION_FLAG = -O0
-COMPILER_GLAGS = -Wall
+LANGUAGE_LEVEL = -std=c++17
+COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter
 LINKER_FLAGS =
 
 
@@ -20,11 +21,11 @@ all: cleanExe $(mainFileName)
 
 # Compiler
 %.o: %.cpp $(filesH)
-	g++ $(COMPILER_GLAGS) $(OPTIMIZATION_FLAG) -c $<
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) -c $<
 
 # Linker
 $(mainFileName): $(filesObj)
-	g++ $(COMPILER_GLAGS) $(OPTIMIZATION_FLAG) $(LINKER_FLAGS) $^ -o $@
+	g++ $(COMPILER_FLAGS) $(OPTIMIZATION_FLAG) $(LANGUAGE_LEVEL) $(LINKER_FLAGS) $^ -o $@
 
 
 # Utils

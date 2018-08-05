@@ -609,7 +609,7 @@ int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl;
 
     MagicBox mb;
-    mb.work();
+    // mb.work();
     /* mb[0][1] = 7; */
     /* mb[0][2] = 4; */
     /* mb[1][1] = 7; */
