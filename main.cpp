@@ -14,6 +14,7 @@ static const unsigned int NUMBERS_IN_VECTOR = 3;
 static const unsigned int NUMBER_BITS = 3;
 static const unsigned int NUMBER_MAX = (1 << NUMBER_BITS) - 1;
 static const unsigned int EMPTY_NUMBER = NUMBER_MAX + 1;
+static const unsigned int FUNCS_AMOUNT = 2 * NUMBERS_IN_VECTOR - 1;
 
 
 typedef unsigned int Number;
@@ -25,12 +26,6 @@ struct Coord1 {
         unsigned int x;
 
         Coord1(unsigned int x) : x(x) {}
-
-        // TODO: check that works as expected
-        // Cell& operator=(Number& newValue) {
-        //     value = newValue;
-        //     return *this;
-        // }
 };
 struct Coord2 {
     public:
@@ -47,8 +42,6 @@ struct Coord3 {
 
         Coord3(unsigned int x, unsigned int y, unsigned int z) : x(x), y(y), z(z) {}
 };
-/* typedef unsigned int Coord1; */
-/* typedef std::pair<unsigned int, unsigned int> Coord2; */
 
 
 // [low, high]
@@ -85,28 +78,29 @@ struct Func {
             for (unsigned int i = 0; i < SIZE; i++) map[i] = EMPTY_NUMBER;
         }
 
-        Number apply(Number arg) const {
+        Number apply(const Number& arg) const {
             return map[arg];
         }
 
-        bool emptyAt(Number number) const {
+        bool emptyAt(const Number& number) const {
             return (map[number] == EMPTY_NUMBER);
         }
 
-        static bool emptyNumber(Number number) {
+        static bool emptyNumber(const Number& number) {
             return (number == EMPTY_NUMBER);
         }
 
-        Number& operator[](Number index) {
+        Number& operator[](const Number& index) {
             return map[index];
         }
 
-        const Number& operator[](Number index) const {
+        const Number& operator[](const Number& index) const {
             return map[index];
         }
 };
 // ----------------------------------------------------------------------------
-static const unsigned int FUNCS_AMOUNT = 2 * NUMBERS_IN_VECTOR - 1;
+// (row, column) of Func
+typedef std::array<Func, FUNCS_AMOUNT> Functions;
 // ----------------------------------------------------------------------------
 Number XOR(const Number& a, const Number& b) {
     return a ^ b;
@@ -118,9 +112,7 @@ struct Cell {
 
         Cell() : value(EMPTY_NUMBER) {}
 
-        Cell(Number value) : value(value) {
-
-        }
+        Cell(Number value) : value(value) {}
 
         bool empty() const {
             return value == EMPTY_NUMBER;
@@ -141,9 +133,7 @@ struct Block {
         Number in;
         Number out;
 
-        Block(Func& func) : func(func), in(EMPTY_NUMBER), out(EMPTY_NUMBER) {
-
-        }
+        Block(Func& func) : func(func), in(EMPTY_NUMBER), out(EMPTY_NUMBER) {}
 
         bool empty() const {
             return (in == EMPTY_NUMBER) || (out == EMPTY_NUMBER);
@@ -155,8 +145,7 @@ struct Block {
             } else if (index == 1) {
                 return out;
             } else {
-                // TODO: check
-                std::cout << ":> [Block.operator[]]: Unsupported index used: "
+                std::cout << ":> [Block.operator[]()]: Unsupported index used: "
                     << index << "." << std::endl;
             }
         }
@@ -167,8 +156,7 @@ struct Block {
             } else if (index == 1) {
                 return out;
             } else {
-                // TODO: check
-                std::cout << ":> [Block.operator[]]: Unsupported index used: "
+                std::cout << ":> [Block.operator[]()]: Unsupported index used: "
                     << index << "." << std::endl;
             }
         }
@@ -241,11 +229,9 @@ class Snapshot {
         }
 };
 // ----------------------------------------------------------------------------
-// (row, column) of Func
-typedef std::array<Func, FUNCS_AMOUNT> Functions;
 // ----------------------------------------------------------------------------
 enum LocationType {
-    LocationTypeX, LocationTypeBuffer, LocationTypeFunc
+    LocationType_X, LocationType_Buffer, LocationType_Func
 };
 
 struct Location {
@@ -253,20 +239,20 @@ struct Location {
         const LocationType type;
         const std::variant<Coord1, Coord3> coord;
 
-        Location(LocationType type, std::variant<Coord1, Coord3> coord)
+        Location(LocationType type, const std::variant<Coord1, Coord3>& coord)
             : type(type), coord(coord) {}
 
         void place(const Number& number, Snapshot& snapshot) const {
             switch (type) {
-                case LocationTypeX:
+                case LocationType_X:
                     assert(std::holds_alternative<Coord1>(coord));
                     snapshot.xs[std::get<Coord1>(coord).x] = number;
                     break;
-                case LocationTypeBuffer:
+                case LocationType_Buffer:
                     assert(std::holds_alternative<Coord1>(coord));
                     snapshot.buffers[std::get<Coord1>(coord).x] = number;
                     break;
-                case LocationTypeFunc: {
+                case LocationType_Func: {
                         assert(std::holds_alternative<Coord3>(coord));
                         const auto& coordinates = std::get<Coord3>(coord);
                         snapshot.rows[coordinates.x][coordinates.y][coordinates.z] = number;
@@ -283,6 +269,7 @@ struct Location {
 // Unconditional
 struct Action {
     private:
+        // TODO: as of now, every Action holds the same redundant two fields. Fix.
         Snapshot& snapshot;
         Functions& funcs;
 
@@ -290,7 +277,7 @@ struct Action {
         const Number value;
 
         void undo() {
-            // coord->value = EMPTY;
+            location.place(EMPTY_NUMBER, snapshot);
         }
 
     public:
@@ -319,7 +306,7 @@ struct Step {
         Step() {}
 
         // TODO: use "move" here
-        Step(Action& action) {
+        Step(const Action& action) {
             actions.push_back(action);
         }
 
@@ -410,7 +397,7 @@ class Strategy {
             // upon call => don't care about the value anymore.
             /* return (nextIndex-- > 0); */
 
-            // This solutuon doesn't spoil X
+            // This solution doesn't spoil X
             if (nextIndex > 0) {
                 nextIndex--;
                 return true;
@@ -472,14 +459,14 @@ public:
                    __attribute__((unused))  const Snapshot& snapshot,
                    __attribute__((unused)) const Functions& funcs) -> std::optional<Location> {
             if (index < NUMBERS_IN_VECTOR) { // first three insertions
-                return {{LocationTypeX, index}};
+                return {{LocationType_X, index}};
             } else {
                 const auto emptyFunc = findEmptyFunc(snapshot);
                 if (emptyFunc) {
                     const Coord2& funcCoord = *emptyFunc;
                     const unsigned int inFieldCoord = 0;
                     const Coord3 location = Coord3(funcCoord.x, funcCoord.y, inFieldCoord);
-                    return {{LocationTypeFunc, location}};
+                    return {{LocationType_Func, location}};
                 } else {
                     return std::nullopt;
                 }
@@ -493,12 +480,12 @@ public:
 
             /* const Location& currentLocation = stepsStack.top(); // TODO: can do without 'top()'?? */
             /* switch (currentLocation.type) { */
-            /*     case LocationTypeX: */
+            /*     case LocationType_X: */
             /*         break; */
-            /*     case LocationTypeBuffer: */
+            /*     case LocationType_Buffer: */
             /*         // TODO */
             /*         break; */
-            /*     case LocationTypeFunc: */
+            /*     case LocationType_Func: */
             /*         // TODO */
             /*         break; */
             /* } */
@@ -554,31 +541,8 @@ public:
     /*  */
     /*     return output; */
     /* } */
-// ----------------------------------------------------------------------------
-    /*
-     * Input: empty MB
-     * Output: filled MB, returns the target Y
-     * TODO
-     */
-    /* Vector algorithm1() { */
-    /*     const Vector Y = generateRandomVector(); */
-    /*  */
-    /*     while (true) { */
-    /*         const Vector X = generateRandomVector(); */
-    /*         Number layer[FUNCS_AMOUNT]; */
-    /*         unsigned int layerSize = Y.size(); // current size. will grow */
-    /*  */
-    /*         // Step into the bottom-most cascade */
-    /*         for (unsigned int i = 0; i < layerSize; i++) { */
-    /*             layer[i] = Y[i] ^ X[i]; */
-    /*         } */
-    /*  */
-    /*  */
-    /*     } */
-    /*  */
-    /*     return Y; */
-    /* } */
 };
+// ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 void fillRemainingRandom(MagicBox& magicBox) {
