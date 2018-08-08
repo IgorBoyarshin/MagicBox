@@ -131,6 +131,8 @@ struct Cell {
         // }
 };
 
+static const unsigned int BLOCK_IN = 0;
+static const unsigned int BLOCK_OUT = 1;
 struct Block {
     private:
         Func& func;
@@ -140,9 +142,9 @@ struct Block {
         }
 
         Number& at(unsigned int index) {
-            if (index == 0) {
+            if (index == BLOCK_IN) {
                 return in;
-            } else if (index == 1) {
+            } else if (index == BLOCK_OUT) {
                 return out;
             } else {
                 std::cout << ":> [Block.operator[]()]: Unsupported index used: "
@@ -151,14 +153,22 @@ struct Block {
         }
 
 
-    public:
         Number in;
         Number out;
 
+    public:
         Block(Func& func) : func(func), in(EMPTY_NUMBER), out(EMPTY_NUMBER) {}
 
         bool empty() const {
             return (in == EMPTY_NUMBER) || (out == EMPTY_NUMBER);
+        }
+
+        bool emptyIn() const {
+            return (in == EMPTY_NUMBER);
+        }
+
+        bool emptyOut() const {
+            return (out == EMPTY_NUMBER);
         }
 
         bool full() const {
@@ -166,14 +176,22 @@ struct Block {
         }
 
         const Number& operator[](unsigned int index) const {
-            if (index == 0) {
+            if (index == BLOCK_IN) {
                 return in;
-            } else if (index == 1) {
+            } else if (index == BLOCK_OUT) {
                 return out;
             } else {
                 std::cout << ":> [Block.operator[]()]: Unsupported index used: "
                     << index << "." << std::endl;
             }
+        }
+
+        const Number& In() const {
+            return in;
+        }
+
+        const Number& Out() const {
+            return out;
         }
 
         // Allow modifications only throught here
@@ -264,10 +282,10 @@ enum LocationType {
 
 struct Location {
     public:
-        const LocationType type;
-        const std::variant<Coord1, Coord3> coord;
+        LocationType type;
+        std::variant<Coord1, Coord3> coord;
 
-        Location(LocationType type, const std::variant<Coord1, Coord3>& coord)
+        Location(const LocationType& type, const std::variant<Coord1, Coord3>& coord)
             : type(type), coord(coord) {}
 
         void place(const Number& number, Snapshot& snapshot) const {
@@ -298,26 +316,23 @@ struct Location {
 struct Action {
     private:
         // TODO: as of now, every Action holds the same redundant field. Fix.
-        Snapshot& snapshot;
+        // Snapshot& snapshot;
 
-        const Location location;
-        const Number value;
-
-        void undo() {
-            location.place(EMPTY_NUMBER, snapshot);
-        }
+        Location location;
+        Number value;
 
     public:
         Action(
-                Snapshot& snapshot,
                 const Location& location,
                 const Number& value)
-            : snapshot(snapshot), location(location), value(value) {
-                location.place(value, snapshot);
-            }
+            : location(location), value(value) {}
 
-        ~Action() {
-            undo();
+        void undo(Snapshot& snapshot) {
+            location.place(EMPTY_NUMBER, snapshot);
+        }
+
+        void apply(Snapshot& snapshot) {
+            location.place(value, snapshot);
         }
 
         const Number& getValue() const {
@@ -331,7 +346,6 @@ struct Step {
     private:
         static const unsigned int ALLOWED_RETRIES = 4;
 
-        // TODO: make const Location
         Location baseLocation;
         std::vector<Action> actions;
         std::set<Number> triedNumbers;
@@ -339,26 +353,13 @@ struct Step {
     public:
         Step(const Location& location) : baseLocation(location) {}
 
-        /* Step(const Action& baseAction) : baseAction(baseAction) { */
-        /*     triedNumbers.insert(baseAction.getValue()); */
-        /* } */
-
-        /* Step(const Action& baseAction, const std::vector<Action>& actions) : baseAction(baseAction), actions(actions) { */
-        /*     triedNumbers.insert(baseAction.getValue()); */
-        /* } */
-
-        // inline unsigned int amountOfTries() const {
-        //     return usedOptions.size();
-        // }
-        
         void apply(Snapshot& snapshot, const Number& number) {
             triedNumbers.insert(number);
             actions.clear();
-            actions.emplace_back(snapshot, baseLocation, number);
+            actions.emplace_back(baseLocation, number);
         }
 
         void applyActions(const std::vector<Action>& newActions) {
-        // HERE
             actions.insert(actions.end(), newActions.begin(), newActions.end());
         }
 
@@ -368,6 +369,12 @@ struct Step {
 
         bool belowLimit() {
             return (triedNumbers.size() < ALLOWED_RETRIES);
+        }
+
+        void cleanup(Snapshot& snapshot) {
+            for (Action& action : actions) {
+                action.undo(snapshot);
+            }
         }
 
         std::optional<Number> getUntriedNumber() const {
@@ -415,17 +422,16 @@ class Stack {
             return {step};
         }
 
-        // HERE
-        /* std::optional<Step&> top() { */
-        /*     if (steps.size() > 0) { */
-        /*         return {steps.top()}; */
-        /*     } */
-        /*  */
-        /*     return std::nullopt; */
-        /*  */
-        /*     // TODO: why doesn't work??? */
-        /*     #<{(| return (steps.size() > 0) ? ({steps.top()}) : std::nullopt; |)}># */
-        /* } */
+        std::optional<std::reference_wrapper<Step>> top() {
+            if (steps.size() > 0) {
+                return {steps.top()};
+            }
+
+            return std::nullopt;
+
+            // TODO: why doesn't work???
+            /* return (steps.size() > 0) ? ({steps.top()}) : std::nullopt; */
+        }
 
         const Step& top() const {
             return steps.top();
@@ -565,108 +571,42 @@ public:
         });
 
 
-        /* while (const std::optional<Location> locationOpt = strategy.getNext(snapshot, funcs)) { */
-        /*     const Location location = *locationOpt; */
-        /*  */
-        /*     // stepsStack.emplace(location); */
-        /*     // std::optional<Step&> stepOpt = stepsStack.top(); */
-        /*     std::optional<Step> stepOpt{location}; */
-        /*     do { */
-        /*         Step& step = *stepOpt; */
-        /*         const std::optional<Number> numberOpt = step.getUntriedNumber(); */
-        /*         const std::optional<std::vector<Action>> actionsOpt = */
-        /*             (numberOpt) ? (step.apply(snapshot, *numberOpt), distributePokeFrom(snapshot, funcs, location)) */
-        /*                         : (std::nullopt); */
-        /*         if (numberOpt && actionsOpt) { */
-        /*             step.applyActions(*actionsOpt); */
-        /*             stepsStack.push(step); */
-        /*  */
-        /*             stepOpt = std::nullopt; */
-        /*         } else { */
-        /*             step.fail(); // inc tries */
-        /*             while (stepOpt && !stepsStack.belowLimit()) { */
-        /*                 #<{(| stepOpt = stepsStack.pop(); // std::nullopt if stack became empty |)}># */
-        /*                 if (stepOpt) { */
-        /*                     stepOpt->fail(); // child failed => he failed */
-        /*                 } */
-        /*                 strategy.revert(); */
-        /*             } */
-        /*  */
-        /*             // By this line we've either reverted to a valid Step on Stack */
-        /*             // or made stepOpt == std::nullopt if the stack delpeted */
-        /*             if (!stepOpt) { */
-        /*                 return false; // failed to construct Vector<X> */
-        /*             } */
-        /*         } */
-        /*     } while (stepOpt); */
-        /* } */
+        while (const std::optional<Location> locationOpt = strategy.getNext(snapshot, funcs)) {
+            const Location location = *locationOpt;
 
+            std::optional<Step> stepOpt{location};
+            do {
+                Step& step = *stepOpt;
+                const std::optional<Number> numberOpt = step.getUntriedNumber();
+                const std::optional<std::vector<Action>> actionsOpt =
+                    (numberOpt) ? (poke(snapshot, location, *numberOpt))
+                                : (std::nullopt);
+                /* const std::optional<std::vector<Action>> actionsOpt = */
+                /*     (numberOpt) ? (step.apply(snapshot, *numberOpt), poke(snapshot, location)) */
+                /*                 : (std::nullopt); */
+                if (numberOpt && actionsOpt) {
+                    step.applyActions(*actionsOpt);
+                    stepsStack.push(step);
 
+                    stepOpt = std::nullopt;
+                } else {
+                    step.fail(); // inc tries
+                    while (stepOpt && !stepsStack.belowLimit()) {
+                        stepOpt = stepsStack.pop(); // std::nullopt if stack became empty
+                        if (stepOpt) {
+                            stepOpt->fail(); // child failed => he failed
+                        }
+                        strategy.revert();
+                    }
 
-
-
-        /* while (const std::optional<Location> locationOpt = strategy.getNext(snapshot, funcs)) { */
-        /*     const Location location = *locationOpt; */
-        /*  */
-        /*     std::optional<Step> stepOpt{location}; */
-        /*     do { */
-        /*         Step& step = *stepOpt; */
-        /*         const std::optional<Number> numberOpt = step.getUntriedNumber(); */
-        /*         const std::optional<std::vector<Action>> actionsOpt = */
-        /*             (numberOpt) ? (step.apply(*number), distributePokeFrom(snapshot, funcs, location)) */
-        /*                         : (std::nullopt); */
-        /*         if (numberOpt && actionsOpt) { */
-        /*             step.applyActions(*actionsOpt); */
-        /*             stepsStack.push(step); */
-        /*  */
-        /*             stepOpt = std::nullopt; */
-        /*         } else { */
-        /*             step.fail(); // inc tries */
-        /*             while (stepOpt && !stepsStack.belowLimit()) { */
-        /*                 stepOpt = stepsStack.pop(); // std::nullopt if stack became empty */
-        /*                 if (stepOpt) { */
-        /*                     stepOpt->fail(); // child failed => he failed */
-        /*                 } */
-        /*                 strategy.revert(); */
-        /*             } */
-        /*  */
-        /*             // By this line we've either reverted to a valid Step on Stack */
-        /*             // or made stepOpt == std::nullopt if the stack delpeted */
-        /*             if (!stepOpt) { */
-        /*                 return false; // failed to construct Vector<X> */
-        /*             } */
-        /*         } */
-        /*     } while (stepOpt); */
-        /* } */
-
-
-
-        /* while (const std::optional<Location> locationOpt = strategy.getNext(snapshot, funcs)) { */
-        /*     const Location location = *locationOpt; */
-        /*  */
-        /*     #<{(| TODO: Apply Number here |)}># */
-        /*     // Either random number or deduced from context */
-        /*     if (const std::optional<Number> numberOpt = stepsStack.top().getUntriedNumber()) { */
-        /*         const Number number = *numberOpt; */
-        /*         Step step(Action(snapshot, location, number)); */
-        /*  */
-        /*  */
-        /*         if (const auto actionsOpt = distributePokeFrom(snapshot, funcs, location)) { */
-        /*             stepsStack.applyActions(*actionsOpt); */
-        /*             #<{(| stepsStack.push(Step(*actionsOpt)); // A successful step |)}># */
-        /*         } else { */
-        /*             // An unconditional conflict arose down the line as the result of */
-        /*             // applying the Number at Location => revert back. */
-        /*             std::cout << ":> Conflict here" << std::endl; */
-        /*  */
-        /*             stepsStack.retry(); */
-        /*             strategy.revert(); */
-        /*         } */
-        /*     } else { */
-        /*         // Current step depleted => revert */
-        /*     } */
-        /*  */
-        /* } */
+                    // By this line we've either reverted to a valid Step on Stack
+                    // or made stepOpt == std::nullopt if the stack delpeted
+                    if (!stepOpt) {
+                        return false; // failed to construct Vector<X>
+                    }
+                }
+            } while (stepOpt);
+        }
 
 
 
@@ -675,56 +615,100 @@ public:
     }
 
 
+    /* // returns std::nullopt if a conflict arose */
+    /* std::optional<std::vector<Action>> distributePokeFrom(Snapshot& snapshot, Functions& funcs, const Location& location) { */
+    /*     #<{(| switch(type) { |)}># */
+    /*     #<{(|     case : |)}># */
+    /*     #<{(|         poke1 poke2 |)}># */
+    /*             // get from poke() */
+    /*     // } */
+    /*  */
+    /*     #<{(| return summary poke |)}># */
+    /*     return {}; */
+    /* } */
+
+
     // returns std::nullopt if a conflict arose
-    std::optional<std::vector<Action>> distributePokeFrom(Snapshot& snapshot, Functions& funcs, const Location& location) {
-        /* switch(type) { */
-        /*     case : */
-        /*         poke1 poke2 */
-                // get from poke()
-        // }
-
-        /* return summary poke */
-        return {};
-    }
-
-
-    // returns std::nullopt if a conflict arose
-    std::optional<std::vector<Action>> poke(Snapshot& snapshot, Functions& funcs, const Location& location) {
-        // if (!empty) {
-        // return {{}};
-
+    // returns {{}} (an ampty vector) if there was nothing to do
+    // TODO: create lambda for extractiong Actions from pokes
+    std::optional<std::vector<Action>> poke(Snapshot& snapshot, const Location& location, const Number& number) {
         std::vector<Action> actions;
+        actions.emplace_back(location, number); // self
+        actions[0].apply(snapshot);
 
-        /* switch (location.type) { */
-        /*     case LocationType_X: { */
-        /*             assert(std::holds_alternative<Coord1>(location.coord)); */
-        /*             const unsigned int xIndex = std::get<Coord1>(location.coord).x; */
-        /*  */
-        /*             const Cell& cell = snapshot.xs[xIndex]; */
-        /*             if (!cell.empty()) { */
-        /*                 // assert(false && "[MagicBox.generateNewX()]: X Cell not empty."); // remove me later */
-        /*                 std::cout << ":> [MagicBox.generateNewX()]: X Cell not empty at: " << xIndex << " (" << cell.value << ")." << std::endl; */
-        /*                 return std::nullopt; */
-        /*             } */
-        /*             const Number numberToPut = generateRandomNumber(); // TODO: rand here?? */
-        /*             snapshot.xs[xIndex].value = numberToPut; */
-        /*  */
-        /*             const std::optional<std::vector<Action>> pokeBuffer = poke(); */
-        /*  */
-        /*  */
-        /*             const std::optional<std::vector<Action>> pokeFunc = poke(); */
-        /*             if (xIndex < NUMBERS_IN_VECTOR - 1) { */
-        /*                 const std::optional<std::vector<Action>> pokeFuncSecondary = poke(); */
-        /*             } */
-        /*         } */
-        /*         break; */
-        /*     case LocationType_Buffer: */
-        /*         // TODO */
-        /*         break; */
-        /*     case LocationType_Func: */
-        /*         // TODO */
-        /*         break; */
-        /* } */
+        const auto insertActions = [&](const LocationType& locationType, std::variant<Coord1, Coord3> coord, const Number& value) -> bool {
+            if (const auto& actionsOpt = poke(snapshot, Location(locationType, coord), value)) {
+                actions.insert(actions.end(), actionsOpt->begin(), actionsOpt->end());
+                return true;
+            }
+
+            return false;
+        };
+
+        switch (location.type) {
+            // is to poked set only from the outside
+            case LocationType_X: {
+                    assert(std::holds_alternative<Coord1>(location.coord));
+                    const unsigned int index = std::get<Coord1>(location.coord).x;
+
+                    // Main In
+                    assert(snapshot.rows[0][index].emptyIn() && ":> IN not empty when X got poked.");
+                    if (const bool successfullPoke = insertActions(LocationType_Func, Coord3(0, index, BLOCK_IN), number); !successfullPoke) return std::nullopt;
+
+                    // Secondary In
+                    if (index < NUMBERS_IN_VECTOR - 1) {
+                        assert(snapshot.rows[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when X got poked.");
+                        if (const bool successfullPoke = insertActions(LocationType_Func, Coord3(0, index + NUMBERS_IN_VECTOR, BLOCK_IN), number); !successfullPoke) return std::nullopt;
+                    }
+
+                    // Buffer
+                    assert(snapshot.buffers[index].empty() && ":> Buffer not empty when X got poked.");
+                    if (const bool successfullPoke = insertActions(LocationType_Buffer, Coord1(index), XOR(number, snapshot.ys[index].value)); !successfullPoke) return std::nullopt;
+                }
+                break;
+            case LocationType_Buffer: {
+                    assert(std::holds_alternative<Coord1>(location.coord));
+                    const unsigned int index = std::get<Coord1>(location.coord).x;
+
+                    if (!snapshot.xs[index].empty() && (snapshot.xs[index].value != number)) {
+                            // The value we're trying to set to Buffer does not equal the current value of X
+                            return std::nullopt;
+                    }
+                    snapshot.xs[index].value = number; // just set X, but never poke it
+
+                    // Main In
+                    assert(snapshot.rows[0][index].emptyIn() && ":> IN not empty when Buffer got poked and X was empty.");
+                    if (const bool successfullPoke = insertActions(LocationType_Func, Coord3(0, index, BLOCK_IN), number); !successfullPoke) return std::nullopt;
+
+                    // Secondary In
+                    if (index < NUMBERS_IN_VECTOR - 1) {
+                        assert(snapshot.rows[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when Buffer got poked and X was empty.");
+                        if (const bool successfullPoke = insertActions(LocationType_Func, Coord3(0, index + NUMBERS_IN_VECTOR, BLOCK_IN), number); !successfullPoke) return std::nullopt;
+                    }
+
+                    // Outs
+                    const unsigned int lastRowIndex = snapshot.rows.size() - 1;
+                    const Block& block1 = snapshot.rows[lastRowIndex][index];
+                    const Block& block2 = snapshot.rows[lastRowIndex][index + 1];
+                    if (block1.emptyOut() && block2.emptyOut()) {
+                        if (XOR(block1.Out(), block2.Out()) != number) {
+                            return std::nullopt;
+                        }
+                    }
+                    if (block1.emptyOut() && !block2.emptyOut()) {
+                        Block& block1 = snapshot.rows[lastRowIndex][index];
+                        Block& block2 = snapshot.rows[lastRowIndex][index + 1];
+                        if (const bool successfullPoke = insertActions(LocationType_Func, Coord3(lastRowIndex, index, BLOCK_OUT), XOR(number, block2.Out())); !successfullPoke) return std::nullopt;
+                    } else if (block1.emptyOut() && !block2.emptyOut()) {
+                        Block& block1 = snapshot.rows[lastRowIndex][index];
+                        Block& block2 = snapshot.rows[lastRowIndex][index + 1];
+                        if (const bool successfullPoke = insertActions(LocationType_Func, Coord3(lastRowIndex, index + 1, BLOCK_OUT), XOR(number, block1.Out())); !successfullPoke) return std::nullopt;
+                    }
+                }
+                break;
+            case LocationType_Func:
+                break;
+        }
 
         return {actions};
     }
@@ -800,6 +784,14 @@ int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl;
 
     MagicBox mb;
+
+    // Coord1 c1(4);
+    // std::optional<std::reference_wrapper<Coord1>> opt{c1};
+    // (*opt).get().x = 5;
+    // std::cout << c1.x << std::endl;
+
+
+
     // mb.work();
     /* mb[0][1] = 7; */
     /* mb[0][2] = 4; */
