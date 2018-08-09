@@ -223,7 +223,7 @@ class Snapshot {
         std::array<Func, FUNCS_AMOUNT>& funcs;
 
         // Abstract snapshot Funcs
-        std::vector<std::vector<Block>> rows;
+        std::vector<std::vector<Block>> blocks;
         std::array<Cell, NUMBERS_IN_VECTOR> buffers;
         std::array<Cell, NUMBERS_IN_VECTOR> xs;
         const std::array<Cell, NUMBERS_IN_VECTOR> ys;
@@ -231,7 +231,7 @@ class Snapshot {
     private:
         void init() {
             const unsigned int AMOUNT_OF_ROWS = NUMBERS_IN_VECTOR - 1;
-            rows.reserve(AMOUNT_OF_ROWS);
+            blocks.reserve(AMOUNT_OF_ROWS);
             for (unsigned int rowIndex = 0; rowIndex < AMOUNT_OF_ROWS; rowIndex++) {
                 const unsigned int AMOUNT_OF_BLOCKS_IN_ROW = (2 * NUMBERS_IN_VECTOR - 1) - rowIndex;
                 std::vector<Block> row;
@@ -241,7 +241,7 @@ class Snapshot {
                     row.emplace_back(funcs[blockIndex]);
                 }
 
-                rows.push_back(row);
+                blocks.push_back(row);
             }
         }
 
@@ -264,7 +264,7 @@ class Snapshot {
         }
 
         bool existsEmpty() const {
-            for (const auto& row : rows) {
+            for (const auto& row : blocks) {
                 for (const Block& block : row) {
                     if (block.existsEmpty()) {
                         return true;
@@ -312,7 +312,7 @@ struct Location {
                 case LocationType_Func: {
                         assert(std::holds_alternative<Coord3>(coord));
                         const auto& coordinates = std::get<Coord3>(coord);
-                        snapshot.rows[coordinates.x][coordinates.y].update(coordinates.z, number);
+                        snapshot.blocks[coordinates.x][coordinates.y].update(coordinates.z, number);
                     }
                     break;
                 default:
@@ -335,7 +335,7 @@ struct Location {
                 case LocationType_Func: {
                         assert(std::holds_alternative<Coord3>(coord));
                         const auto& coordinates = std::get<Coord3>(coord);
-                        const Block& block = snapshot.rows[coordinates.x][coordinates.y];
+                        const Block& block = snapshot.blocks[coordinates.x][coordinates.y];
                         return emptyNumber(block[coordinates.z]);
                     }
                     break;
@@ -539,10 +539,10 @@ class Strategy {
         }
 };
 // ----------------------------------------------------------------------------
-std::optional<Coord2> findEmptyFunc(const Snapshot& snapshot) {
+std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
     unsigned int rowIndex = 0;
     unsigned int columnIndex = 0;
-    for (const auto& row : snapshot.rows) {
+    for (const auto& row : snapshot.blocks) {
         for (const Block& block : row) {
             if (block.existsEmpty()) {
                 return std::optional<Coord2>{{rowIndex, columnIndex}};
@@ -586,17 +586,20 @@ public:
         Snapshot snapshot(funcs, y);
         Stack stepsStack;
         Strategy strategy([](
-                    __attribute__((unused)) unsigned int index,
-                   __attribute__((unused))  const Snapshot& snapshot,
-                   __attribute__((unused)) const Functions& funcs) -> std::optional<Location> {
+                    unsigned int index,
+                    const Snapshot& snapshot,
+                    const Functions& funcs)
+                -> std::optional<Location> {
             if (index < NUMBERS_IN_VECTOR) { // first three insertions
                 return {{LocationType_X, index}};
             } else {
-                if (const std::optional<Coord2> emptyFunc = findEmptyFunc(snapshot)) {
-                    const Coord2& funcCoord = *emptyFunc;
-                    const unsigned int inFieldCoord = 0;
-                    const Coord3 location = Coord3(funcCoord.x, funcCoord.y, inFieldCoord);
-                    return {{LocationType_Func, location}};
+                if (const std::optional<Coord2> emptyBlock = findEmptyBlock(snapshot)) {
+                    const Coord2& blockCoord = *emptyBlock;
+                    return {{LocationType_Func,
+                             Coord3(
+                                    blockCoord.x,
+                                    blockCoord.y,
+                                    snapshot.blocks[blockCoord.x][blockCoord.y].emptyIn() ? BLOCK_IN : BLOCK_OUT)}};
                 } else {
                     return std::nullopt;
                 }
@@ -646,7 +649,7 @@ public:
 
 
     std::optional<std::vector<Action>> reactOnFuncUpdate(Snapshot& snapshot, const Coord2& coord) {
-        Block& block = snapshot.rows[coord.x][coord.y];
+        Block& block = snapshot.blocks[coord.x][coord.y];
 
         if (block.empty()) {
             return {std::vector<Action>{}}; // nothing new for this place
@@ -725,7 +728,7 @@ public:
         const unsigned int index = std::get<Coord1>(location.coord).x;
 
         // Main In
-        assert(snapshot.rows[0][index].emptyIn() && ":> IN not empty when X got poked.");
+        assert(snapshot.blocks[0][index].emptyIn() && ":> IN not empty when X got poked.");
         if (const bool successfullPoke = insertActions(snapshot, actions,
                     LocationType_Func,
                     Coord3(0, index, BLOCK_IN),
@@ -734,7 +737,7 @@ public:
 
         // Secondary In
         if (index < NUMBERS_IN_VECTOR - 1) {
-            assert(snapshot.rows[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when X got poked.");
+            assert(snapshot.blocks[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when X got poked.");
             if (const bool successfullPoke = insertActions(snapshot, actions,
                         LocationType_Func,
                         Coord3(0, index + NUMBERS_IN_VECTOR, BLOCK_IN),
@@ -764,7 +767,7 @@ public:
         snapshot.xs[index].value = number; // just set X, but never poke it
 
         // Main In
-        assert(snapshot.rows[0][index].emptyIn() && ":> IN not empty when Buffer got poked and X was empty.");
+        assert(snapshot.blocks[0][index].emptyIn() && ":> IN not empty when Buffer got poked and X was empty.");
         if (const bool successfullPoke = insertActions(snapshot, actions,
                     LocationType_Func,
                     Coord3(0, index, BLOCK_IN),
@@ -773,7 +776,7 @@ public:
 
         // Secondary In
         if (index < NUMBERS_IN_VECTOR - 1) {
-            assert(snapshot.rows[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when Buffer got poked and X was empty.");
+            assert(snapshot.blocks[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when Buffer got poked and X was empty.");
             if (const bool successfullPoke = insertActions(snapshot, actions,
                         LocationType_Func,
                         Coord3(0, index + NUMBERS_IN_VECTOR, BLOCK_IN),
@@ -782,11 +785,11 @@ public:
         }
 
         // Outs
-        const unsigned int lastRowIndex = snapshot.rows.size() - 1;
-        const Block& block1Const = snapshot.rows[lastRowIndex][index];
-        const Block& block2Const = snapshot.rows[lastRowIndex][index + 1];
-        Block& block1 = snapshot.rows[lastRowIndex][index];
-        Block& block2 = snapshot.rows[lastRowIndex][index + 1];
+        const unsigned int lastRowIndex = snapshot.blocks.size() - 1;
+        const Block& block1Const = snapshot.blocks[lastRowIndex][index];
+        const Block& block2Const = snapshot.blocks[lastRowIndex][index + 1];
+        Block& block1 = snapshot.blocks[lastRowIndex][index];
+        Block& block2 = snapshot.blocks[lastRowIndex][index + 1];
         if (block1.emptyOut() && block2.emptyOut()) {
             if (XOR(block1Const.Out(), block2Const.Out()) != number) {
                 return false;
@@ -843,10 +846,10 @@ public:
             }
         } else {
             // Outs
-            const Block& block1Const = snapshot.rows[rowIndex - 1][columnIndex];
-            const Block& block2Const = snapshot.rows[rowIndex - 1][columnIndex + 1];
-            Block& block1 = snapshot.rows[rowIndex - 1][columnIndex];
-            Block& block2 = snapshot.rows[rowIndex - 1][columnIndex + 1];
+            const Block& block1Const = snapshot.blocks[rowIndex - 1][columnIndex];
+            const Block& block2Const = snapshot.blocks[rowIndex - 1][columnIndex + 1];
+            Block& block1 = snapshot.blocks[rowIndex - 1][columnIndex];
+            Block& block2 = snapshot.blocks[rowIndex - 1][columnIndex + 1];
             if (block1.emptyOut() && block2.emptyOut()) {
                 if (XOR(block1Const.Out(), block2Const.Out()) != number) {
                     return false;
