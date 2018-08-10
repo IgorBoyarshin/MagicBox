@@ -58,7 +58,7 @@ struct Coord3 {
 
 
 unsigned int getRandomUniformInt(unsigned int low, unsigned int high) {
-    const auto range = high - low;
+    const auto range = high - low + 1;
     return rand() % range + low;
 }
 
