@@ -12,7 +12,7 @@
 #include <stdlib.h>
 
 
-static const bool DO_LOG = false;
+static const bool DO_LOG = true;
 #define LOG(x) if(DO_LOG) x
 
 
@@ -323,6 +323,51 @@ class Snapshot {
 };
 
 
+bool valid(const Snapshot& snapshot) {
+    for (const auto& x : snapshot.xs) {
+        if (emptyNumber(x.value)) {
+            return false;
+        }
+    }
+    for (const auto& b : snapshot.buffers) {
+        if (emptyNumber(b.value)) {
+            return false;
+        }
+    }
+    for (const auto& row : snapshot.blocks) {
+        for (const auto& block : row) {
+            if (block.existsEmpty()) {
+                return false;
+            }
+        }
+    }
+    for (const auto& y : snapshot.ys) {
+        if (emptyNumber(y.value)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool unique(const Vector& vector, const std::vector<Vector>& xs) {
+    for (const Vector& x : xs) {
+        bool allSame = true;
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
+            if (vector[i] != x[i]) {
+                allSame = false;
+                break;
+            }
+        }
+
+        if (allSame) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 Vector extractXs(const Snapshot& snapshot) {
     Vector vector;
     for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
@@ -514,7 +559,7 @@ void undoActions(Snapshot& snapshot, std::vector<Action>& actions) {
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = 4;
+        static const unsigned int ALLOWED_RETRIES = 9;
 
         Location baseLocation;
         std::vector<Action> actions;
@@ -537,6 +582,10 @@ struct Step {
             cleanup(snapshot);
         }
 
+        Location getLocation() const {
+            return baseLocation;
+        }
+
         bool belowLimit() {
             return (triedNumbers.size() < ALLOWED_RETRIES);
         }
@@ -549,14 +598,15 @@ struct Step {
         }
 
         std::optional<Number> getUntriedNumber() const {
-
-            for (unsigned int i = 0; i <= NUMBER_MAX; i++) {
-                const Number number(i);
+            static const unsigned int AMOUNT_OF_TRIES = NUMBERS_IN_VECTOR / 2;
+            for (unsigned int i = 0; i <= AMOUNT_OF_TRIES; i++) {
+                const Number number = generateRandomNumber();
                 if (triedNumbers.find(number) == triedNumbers.end()) {
                     // This number hasn't beed tried
                     return {number};
                 }
             }
+            LOG(std::cout << "Ohno: " << triedNumbers.size() << std::endl;)
 
             return std::nullopt;
         }
@@ -565,7 +615,7 @@ struct Step {
 };
 
 std::ostream& operator<<(std::ostream& stream, const Step& step) {
-    stream << "Step(" << step.baseLocation << "," << step.actions << ")";
+    stream << "Step(" << step.baseLocation << "," << step.actions << "," << step.triedNumbers.size() << ")";
 
     return stream;
 }
@@ -609,9 +659,9 @@ class Stack {
         /*     return steps.top(); */
         /* } */
 
-        bool belowLimit() {
-            return (steps.top().belowLimit());
-        }
+        // bool belowLimit() {
+        //     return (steps.top().belowLimit());
+        // }
 
         void applyActions(const std::vector<Action>& actions) {
             steps.top().applyActions(actions);
@@ -653,14 +703,14 @@ class Strategy {
             return get(nextIndex, snapshot, funcs);
         }
 
-        // bool revert() {
-        //     if (nextIndex > 0) {
-        //         nextIndex--;
-        //         return true;
-        //     }
-        //
-        //     return false;
-        // }
+        bool revert() {
+            if (nextIndex > 0) {
+                nextIndex--;
+                return true;
+            }
+
+            return false;
+        }
 };
 // ----------------------------------------------------------------------------
 std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
@@ -681,12 +731,21 @@ std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
 // ----------------------------------------------------------------------------
 void dumpFuncs(const Functions& funcs) {
     std::cout << "Funcs:" << std::endl;
-    for (const Func& f : funcs) {
-        for (unsigned int i = 0; i <= NUMBER_MAX; i++) {
-            std::cout << f.at(i) << " ";
+    for (unsigned int i = 0; i < Func::SIZE; i++) {
+        for (const Func& func : funcs) {
+            std::cout << i << " -> ";
+            const std::string element = (func.emptyAt(i) ?
+                    std::string("_") : std::to_string(func.map[i]));
+            std::cout << element << "\t\t";
         }
         std::cout << std::endl;
     }
+    /* for (const Func& f : funcs) { */
+    /*     for (unsigned int i = 0; i <= NUMBER_MAX; i++) { */
+    /*         std::cout << f.at(i) << " "; */
+    /*     } */
+    /*     std::cout << std::endl; */
+    /* } */
 }
 // ----------------------------------------------------------------------------
 class MagicBox {
@@ -714,11 +773,24 @@ public:
 
     }
 
-    void work() {
-        const Vector y = generateRandomVector();
+    std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
+        std::cout << "START" << std::endl;
+        while (generateNewX(xs, y));
+        std::cout << "START2" << std::endl;
+        while (generateNewX(xs, y));
+        std::cout << "START3" << std::endl;
+        while (generateNewX(xs, y));
+        std::cout << "START4" << std::endl;
+        while (generateNewX(xs, y));
+        std::cout << "START5" << std::endl;
+        while (generateNewX(xs, y));
+        std::cout << "START6" << std::endl;
+        while (generateNewX(xs, y));
         outputResult(xs, y);
+
+        return xs;
     }
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {
@@ -761,9 +833,9 @@ public:
                 } else {
                     std::cout << "With Number " << "*" << std::endl;
                 }
-                LOG(dumpFuncs(snapshot.funcs);)
+                std::cout << snapshot << std::endl;
                 const std::optional<std::vector<Action>> actionsOpt =
-                    (numberOpt) ? (stepOpt->useNumber(*numberOpt), poke(snapshot, location, *numberOpt))
+                    (numberOpt) ? (stepOpt->useNumber(*numberOpt), poke(snapshot, step.getLocation(), *numberOpt))
                                 : (std::nullopt);
                 if (numberOpt && actionsOpt) {
                     std::cout << ">> Success " << std::endl;
@@ -776,11 +848,14 @@ public:
                 } else {
                     std::cout << ">> Fail " << std::endl;
                     /* step.fail(snapshot); // inc tries. Never need to empty Actions here */
-                    while (stepOpt && !stepsStack.belowLimit()) {
+                    /* std::cout << "Conds: " << (stepOpt ? "true" : "false") << " and " << (!stepOpt->belowLimit() ? "true" : "false") << std::endl; */
+                    /* std::cout << "Oopps: " << (stepOpt ? stepOpt->std::endl; */
+                    while (stepOpt && !stepOpt->belowLimit()) {
                         stepOpt = stepsStack.pop(); // std::nullopt if stack became empty
                         if (stepOpt) {
                             stepOpt->fail(snapshot); // child failed => parent failed. Empty parent's Actions
                         }
+                        strategy.revert();
                     }
 
                     // By this line we've either reverted to a valid Step on Stack
@@ -795,14 +870,25 @@ public:
         }
 
         // Everything is swell, extract the Xs from snapshot
-        xs.push_back(extractXs(snapshot));
+        if (!valid(snapshot)) {
+            return false;
+        }
 
-        return false; // TODO: change back to true
+        const auto x = extractXs(snapshot);
+        if (!unique(x, xs)) {
+            return false;
+        }
+
+        xs.push_back(extractXs(snapshot));
+        dumpFuncs(snapshot.funcs);
+
+        return false;
     }
 
 
     bool reactOnFuncUpdateAndInsert(Snapshot& snapshot, std::vector<Action>& actions, const Coord2& coord) {
         LOG(std::cout << ">>> Inside reactOnFunc for " << coord << std::endl;)
+        assert(snapshot.blocks.size() > coord.x && snapshot.blocks[coord.x].size() > coord.y);
         Block& block = snapshot.blocks[coord.x][coord.y];
 
         if (block.empty()) {
@@ -814,8 +900,6 @@ public:
             LOG(std::cout << "both full, ";)
             LOG(std::cout << (snapshot.funcs[functionIndex].apply(block.In()) == block.Out() ? "matched" : "no match");)
             LOG(std::cout << std::endl;)
-            /* std::cout << block.In() << " : " << block.Out() << std::endl; */
-            /* dumpFuncs(snapshot.funcs); */
             return snapshot.funcs[functionIndex].apply(block.In()) == block.Out();
         } else if (block.emptyOut()) {
             if (const Number funcRes = snapshot.funcs[functionIndex].apply(block.In());
@@ -850,7 +934,7 @@ public:
         }
 
         LOG(std::cout << "Failed pokeAndInsert" << std::endl;)
-        LOG(dumpFuncs(snapshot.funcs);)
+        // LOG(dumpFuncs(snapshot.funcs);)
         return false;
     }
 
@@ -862,6 +946,7 @@ public:
         actions.emplace_back(location, number); // self
         actions[0].apply(snapshot);
         LOG(std::cout << actions << std::endl;)
+        LOG(std::cout << snapshot << std::endl;)
         LOG(dumpFuncs(snapshot.funcs);)
 
         switch (location.type) {
@@ -921,12 +1006,19 @@ public:
         }
 
         // Buffer
-        assert(snapshot.buffers[index].empty() && ":> Buffer not empty when X got poked.");
-        if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                    LocationType_Buffer,
-                    Coord1(index),
-                    XOR(number, snapshot.ys[index].value));
-                !successfulPoke) return false;
+        /* assert(snapshot.buffers[index].empty() && ":> Buffer not empty when X got poked."); */
+        if (snapshot.buffers[index].empty()) {
+            if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
+                        LocationType_Buffer,
+                        Coord1(index),
+                        XOR(number, snapshot.ys[index].value));
+                    !successfulPoke) return false;
+        } else {
+            if (XOR(number, snapshot.ys[index].value) != snapshot.buffers[index].value) {
+                // doesn't comply
+                return false;
+            }
+        }
 
         LOG(std::cout << ">>> Succ done PokeX" << std::endl;)
         return true;
@@ -1104,7 +1196,6 @@ public:
                     return false;
                 }
             } else {
-                std::cout << "still here 0" << std::endl;
                 if (const auto successfulSet = setFuncAndPokeColumnAndInsert(snapshot, actions,
                             Coord2(rowIndex, columnIndex));
                         !successfulSet) return false;
@@ -1178,7 +1269,7 @@ public:
         /* snapshot.funcs[blockCoord.y].update(block.In(), block.Out()); // set func */
 
         // func for this column has beed altered => poke all Blocks in this column
-        for (unsigned int row = 0; row < snapshot.blocks.size(); row++) {
+        for (unsigned int row = 0; row < ((blockCoord.y <= NUMBERS_IN_VECTOR) ? (snapshot.blocks.size()) : (snapshot.blocks.size() + NUMBERS_IN_VECTOR - blockCoord.y)); row++) {
             // case for row == rowIndex is handled correctly in reactOnFuncUpdateAndInsert, so no worries
             if (const auto updateSuccessful = reactOnFuncUpdateAndInsert(snapshot, actions, Coord2(row, blockCoord.y));
                     !updateSuccessful) return false;
@@ -1200,59 +1291,46 @@ public:
     }
 
 
-    /* Vector apply(const Vector& input) const { */
-    /*     const unsigned int LAYER_SIZE_START = FUNCS_AMOUNT; */
-    /*     Number layer[LAYER_SIZE_START]; */
-    /*     for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) layer[i] = input[i]; */
-    /*     for (unsigned int i = 0; i < NUMBERS_IN_VECTOR - 1; i++) layer[NUMBERS_IN_VECTOR + i] = input[i]; */
-    /*  */
-    /*     for (unsigned int layerSize = LAYER_SIZE_START; layerSize > NUMBERS_IN_VECTOR; layerSize--) { */
-    /*         for (unsigned int funcIndex = 0; funcIndex < layerSize; funcIndex++) { */
-    /*             Number& number = layer[funcIndex]; */
-    /*             if (funcs[funcIndex].emptyAt(number)) { */
-    /*                 std::cout << ":> Usage of empty func entry." << std::endl; */
-    /*             } */
-    /*  */
-    /*             number = funcs[funcIndex].apply(number); */
-    /*         } */
-    /*         for (unsigned int funcIndex = 0; funcIndex < layerSize - 1; funcIndex++) { */
-    /*             layer[funcIndex] = layer[funcIndex] ^ layer[funcIndex + 1]; */
-    /*         } */
-    /*     } */
-    /*  */
-    /*     for (unsigned int funcIndex = 0; funcIndex < NUMBERS_IN_VECTOR; funcIndex++) { */
-    /*         layer[funcIndex] = layer[funcIndex] ^ input[funcIndex]; */
-    /*     } */
-    /*  */
-    /*     Vector output; */
-    /*     for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) output[i] = layer[i]; */
-    /*  */
-    /*     return output; */
-    /* } */
+    Vector apply(const Vector& input) const {
+        const unsigned int LAYER_SIZE_START = FUNCS_AMOUNT;
+        Number layer[LAYER_SIZE_START];
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) layer[i] = input[i];
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR - 1; i++) layer[NUMBERS_IN_VECTOR + i] = input[i];
+
+        for (unsigned int layerSize = LAYER_SIZE_START; layerSize > NUMBERS_IN_VECTOR; layerSize--) {
+            for (unsigned int funcIndex = 0; funcIndex < layerSize; funcIndex++) {
+                Number& number = layer[funcIndex];
+                if (funcs[funcIndex].emptyAt(number)) {
+                    std::cout << ":> Usage of empty func entry." << std::endl;
+                }
+
+                number = funcs[funcIndex].apply(number);
+            }
+            for (unsigned int funcIndex = 0; funcIndex < layerSize - 1; funcIndex++) {
+                layer[funcIndex] = layer[funcIndex] ^ layer[funcIndex + 1];
+            }
+        }
+
+        for (unsigned int funcIndex = 0; funcIndex < NUMBERS_IN_VECTOR; funcIndex++) {
+            layer[funcIndex] = layer[funcIndex] ^ input[funcIndex];
+        }
+
+        Vector output;
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) output[i] = layer[i];
+
+        return output;
+    }
 };
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
-/* void fillRemainingRandom(MagicBox& magicBox) { */
-/*     for (Func& func : magicBox.funcs) { */
-/*         for (Number& number : func.map) { */
-/*             if (Func::emptyNumber(number)) { */
-/*                 number = getRandomUniformInt(static_cast<unsigned int>(0), Func::SIZE - 1); */
-/*             } */
-/*         } */
-/*     } */
-/* } */
-
-
-void print(const MagicBox& magicBox) {
-    for (unsigned int i = 0; i < Func::SIZE; i++) {
-        for (const Func& func : magicBox.funcs) {
-            std::cout << i << " -> ";
-            const std::string element = (func.emptyAt(i) ?
-                    std::string("_") : std::to_string(func.map[i]));
-            std::cout << element << "\t\t";
+void fillRemainingRandom(MagicBox& magicBox) {
+    for (Func& func : magicBox.funcs) {
+        for (Number& number : func.map) {
+            if (emptyNumber(number)) {
+                number = getRandomUniformInt(static_cast<unsigned int>(0), Func::SIZE - 1);
+            }
         }
-        std::cout << std::endl;
     }
 }
 // ----------------------------------------------------------------------------
@@ -1261,29 +1339,32 @@ int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl;
     srand (314);
 
+    const Vector y = generateRandomVector();
     MagicBox mb;
-    mb.work();
+    const auto xs = mb.work(y);
+    fillRemainingRandom(mb);
+    std::cout << std::endl;
 
 
-    /* mb[0][1] = 7; */
-    /* mb[0][2] = 4; */
-    /* mb[1][1] = 7; */
-    /* mb[1][2] = 5; */
-    /* mb[2][2] = 6; */
-    /* mb[2][3] = 4; */
-    /* mb[3][1] = 6; */
-    /* mb[3][3] = 0; */
-    /* mb[4][2] = 5; */
-    /*  */
-    /* Vector n {1, 2, 3}; */
-    /* for (Number nn : mb.apply(n)) { */
-    /*     std::cout << nn << " "; */
-    /* } */
-    /* std::cout << std::endl; */
-
-    // mb[1][2] = 3;
-    // fillRandomRemaining(mb);
-    // print(mb);
+    const unsigned int amount = 8 * 8 * 8;
+    std::cout << "Running " << amount << " samples..." << std::endl;
+    for (unsigned int a = 0; a <= NUMBER_MAX; a++) {
+        for (unsigned int b = 0; b <= NUMBER_MAX; b++) {
+            for (unsigned int c = 0; c <= NUMBER_MAX; c++) {
+                Vector x{};
+                x[0] = a;
+                x[1] = b;
+                x[2] = c;
+                const Vector res = mb.apply(x);
+                if (res == y) {
+                    std::cout << "Match! : " << x << std::endl;
+                }
+            }
+        }
+    }
+    for (unsigned int i = 0; i < amount; i++) {
+    }
+    std::cout << std::endl;
 
 
     std::cout << "---------------------END-----------------------" << std::endl;
