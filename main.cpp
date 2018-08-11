@@ -10,33 +10,95 @@
 #include <stack>
 #include <cassert>
 #include <stdlib.h>
+#include <cstring>
 
 
-static const bool DO_LOG = true;
-#define LOG(x) if(DO_LOG) x
+// ----------------------------------------------------------------------------
+static const bool DO_LOG = false;
+#define LOG(x) if(DO_LOG) {x}
 
 
 static const unsigned int NUMBERS_IN_VECTOR = 3;
 static const unsigned int NUMBER_BITS = 3;
-static const unsigned int NUMBER_MAX = (1 << NUMBER_BITS) - 1;
+
+static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
+static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 static const unsigned int EMPTY_NUMBER = NUMBER_MAX + 1;
 static const unsigned int FUNCS_AMOUNT = 2 * NUMBERS_IN_VECTOR - 1;
-
-
+// ----------------------------------------------------------------------------
 typedef unsigned int Number;
 typedef std::array<Number, NUMBERS_IN_VECTOR> Vector;
 
-// std::ostream& operator<<(std::ostream& stream, const Number& number) {
-//     if (number == EMPTY_NUMBER) {
-//         stream << "_";
-//     } else {
-//         stream << (0 + static_cast<unsigned int>(number));
-//     }
+
+Number XOR(const Number& a, const Number& b) {
+    return a ^ b;
+}
+
+bool emptyNumber(const Number& number) {
+    return (number == EMPTY_NUMBER);
+}
+
+bool unique(const Vector& vector, const std::vector<Vector>& xs) {
+    for (const Vector& x : xs) {
+        bool allSame = true;
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
+            if (vector[i] != x[i]) {
+                allSame = false;
+                break;
+            }
+        }
+
+        if (allSame) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+std::ostream& operator<<(std::ostream& stream, const Vector& vector) {
+    if (vector.size() == 0) {
+        return stream;
+    }
+
+    stream << "(";
+    for (unsigned int i = 0; i < vector.size() - 1; i++) {
+        stream << vector[i] << ",";
+    }
+    stream << vector[vector.size() - 1];
+    stream << ")";
+
+    return stream;
+}
+// ----------------------------------------------------------------------------
+// [low, high]
+// template<typename T = unsigned int>
+// T generateRandomUniformInt(T low, T high) {
+//     static std::random_device rd;
+//     static std::mt19937 e2(rd());
+//     static std::uniform_int_distribution<T> dist(low, high);
 //
-//     return stream;
+//     return dist(e2);
 // }
 
+unsigned int generateRandomUniformInt(unsigned int low, unsigned int high) {
+    const auto range = high - low + 1;
+    return rand() % range + low;
+}
 
+Number generateRandomNumber() {
+    return generateRandomUniformInt((unsigned int)0, NUMBER_MAX);
+}
+
+Vector generateRandomVector() {
+    Vector vector;
+    for (Number& number : vector) {
+        number = generateRandomNumber();
+    }
+
+    return vector;
+}
+// ----------------------------------------------------------------------------
 struct Coord1 {
     public:
         unsigned int x;
@@ -59,115 +121,65 @@ struct Coord3 {
         Coord3(unsigned int x, unsigned int y, unsigned int z) : x(x), y(y), z(z) {}
 };
 
+
 std::ostream& operator<<(std::ostream& stream, const Coord1& coord) {
     stream << "C1(" << coord.x << ")";
-
     return stream;
 }
 std::ostream& operator<<(std::ostream& stream, const Coord2& coord) {
     stream << "C2(" << coord.x << "," << coord.y << ")";
-
     return stream;
 }
 std::ostream& operator<<(std::ostream& stream, const Coord3& coord) {
     stream << "C3(" << coord.x << "," << coord.y << "," << coord.z << ")";
-
     return stream;
 }
 std::ostream& operator<<(std::ostream& stream, const std::variant<Coord1, Coord2, Coord3>& coordVar) {
     if (std::holds_alternative<Coord1>(coordVar)) {
         stream << std::get<Coord1>(coordVar);
     } else if (std::holds_alternative<Coord2>(coordVar)) {
-        stream << std::get<Coord3>(coordVar);
+        stream << std::get<Coord2>(coordVar);
     } else if (std::holds_alternative<Coord3>(coordVar)) {
         stream << std::get<Coord3>(coordVar);
     }
-
     return stream;
 }
-
-
-// [low, high]
-// template<typename T = unsigned int>
-// T getRandomUniformInt(T low, T high) {
-//     static std::random_device rd;
-//     static std::mt19937 e2(rd());
-//     static std::uniform_int_distribution<T> dist(low, high);
-//
-//     return dist(e2);
-// }
-
-
-unsigned int getRandomUniformInt(unsigned int low, unsigned int high) {
-    const auto range = high - low + 1;
-    return rand() % range + low;
-}
-
-
-Number generateRandomNumber() {
-    return getRandomUniformInt((unsigned int)0, NUMBER_MAX);
-}
-
-Vector generateRandomVector() {
-    Vector vector;
-    for (Number& number : vector) {
-        number = generateRandomNumber();
-    }
-
-    return vector;
-}
-// ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 struct Func {
     public:
-        static const unsigned int SIZE = NUMBER_MAX + 1;
+        static const unsigned int SIZE = NUMBERS_AMOUNT;
+
+    private:
         // num_in -> num_out
         Number map[SIZE];
 
+    public:
         Func() {
             for (unsigned int i = 0; i < SIZE; i++) map[i] = EMPTY_NUMBER;
         }
 
-        Number apply(const Number& arg) const {
-            return map[arg];
-        }
-
-        Number at(const Number& arg) const {
-            return map[arg];
-        }
-
-        bool set(const Number& arg) const {
+        bool setAt(const Number& arg) const {
             return (map[arg] != EMPTY_NUMBER);
         }
 
-        bool emptyAt(const Number& number) const {
-            return (map[number] == EMPTY_NUMBER);
+        bool emptyAt(const Number& arg) const {
+            return (map[arg] == EMPTY_NUMBER);
         }
 
         void update(const Number& arg, const Number& value) {
             map[arg] = value;
         }
 
-        // Number& operator[](const Number& index) {
-        //     return map[index];
-        // }
+        const Number& at(const Number& arg) const {
+            return map[arg];
+        }
 
         const Number& operator[](const Number& index) const {
             return map[index];
         }
 };
 
-bool emptyNumber(const Number& number) {
-    return (number == EMPTY_NUMBER);
-}
-
-// ----------------------------------------------------------------------------
-// (row, column) of Func
 typedef std::array<Func, FUNCS_AMOUNT> Functions;
-// ----------------------------------------------------------------------------
-Number XOR(const Number& a, const Number& b) {
-    return a ^ b;
-}
 // ----------------------------------------------------------------------------
 struct Cell {
     public:
@@ -181,33 +193,28 @@ struct Cell {
             return emptyNumber(value);
         }
 };
-
-
+// ----------------------------------------------------------------------------
 static const unsigned int BLOCK_IN = 0;
 static const unsigned int BLOCK_OUT = 1;
+
 struct Block {
     private:
-        Func& func;
         Number in;
         Number out;
 
-        Number& operator[](unsigned int index) {
-            return at(index);
-        }
-
         Number& at(unsigned int index) {
-            assert(index == 0 || index == 1);
+            assert(index <= 1);
             return (index == BLOCK_IN) ? in : out;
         }
 
         const Number& at(unsigned int index) const {
-            assert(index == 0 || index == 1);
+            assert(index <= 1);
             return (index == BLOCK_IN) ? in : out;
         }
 
 
     public:
-        Block(Func& func) : func(func), in(EMPTY_NUMBER), out(EMPTY_NUMBER) {}
+        Block() : in(EMPTY_NUMBER), out(EMPTY_NUMBER) {}
 
         bool existsEmpty() const {
             return !full();
@@ -241,24 +248,15 @@ struct Block {
             return out;
         }
 
-        // Allow modifications only throught here
         void update(unsigned int index, const Number& number) {
-            /* if (full()) { // the only case when func is already set */
-            /*     func.update(in, EMPTY_NUMBER); // unset */
-            /* } */
             at(index) = number;
-            /* if (full()) { */
-            /*     func.update(in, number); */
-            /* } */
         }
 };
-
+// ----------------------------------------------------------------------------
 class Snapshot {
     public:
-        // Real physical Funcs
-        std::array<Func, FUNCS_AMOUNT>& funcs;
+        Functions& funcs;
 
-        // Abstract snapshot Funcs
         std::vector<std::vector<Block>> blocks;
         std::array<Cell, NUMBERS_IN_VECTOR> buffers;
         std::array<Cell, NUMBERS_IN_VECTOR> xs;
@@ -274,7 +272,7 @@ class Snapshot {
                 row.reserve(AMOUNT_OF_BLOCKS_IN_ROW);
 
                 for (unsigned int blockIndex = 0; blockIndex < AMOUNT_OF_BLOCKS_IN_ROW; blockIndex++) {
-                    row.emplace_back(funcs[blockIndex]);
+                    row.emplace_back();
                 }
 
                 blocks.push_back(row);
@@ -284,17 +282,14 @@ class Snapshot {
         static std::array<Cell, NUMBERS_IN_VECTOR> convertVectorToCells(const Vector& vector) {
             std::array<Cell, NUMBERS_IN_VECTOR> cells;
             for (unsigned int i = 0; i < vector.size(); i++) {
-                const Number& number = vector[i];
-                cells[i] = Cell(number);
+                cells[i] = Cell(vector[i]);
             }
 
             return cells;
         }
 
     public:
-        Snapshot(
-                std::array<Func, FUNCS_AMOUNT>& funcs,
-                const Vector& ys)
+        Snapshot(Functions& funcs, const Vector& ys)
                 : funcs(funcs), ys(convertVectorToCells(ys)) {
             init();
         }
@@ -307,8 +302,8 @@ class Snapshot {
                     }
                 }
             }
-            for (const Cell& cell : buffers) {
-                if (cell.empty()) {
+            for (const Cell& buffer : buffers) {
+                if (buffer.empty()) {
                     return true;
                 }
             }
@@ -323,7 +318,7 @@ class Snapshot {
 };
 
 
-bool valid(const Snapshot& snapshot) {
+bool full(const Snapshot& snapshot) {
     for (const auto& x : snapshot.xs) {
         if (emptyNumber(x.value)) {
             return false;
@@ -350,24 +345,6 @@ bool valid(const Snapshot& snapshot) {
     return true;
 }
 
-bool unique(const Vector& vector, const std::vector<Vector>& xs) {
-    for (const Vector& x : xs) {
-        bool allSame = true;
-        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
-            if (vector[i] != x[i]) {
-                allSame = false;
-                break;
-            }
-        }
-
-        if (allSame) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 Vector extractXs(const Snapshot& snapshot) {
     Vector vector;
     for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
@@ -381,7 +358,6 @@ Vector extractXs(const Snapshot& snapshot) {
 
 std::ostream& operator<<(std::ostream& stream, const Snapshot& snapshot) {
     stream << "+++++++Snap+++++" << std::endl;
-    /* stream << "Xs: "; */
     for (const auto& x : snapshot.xs) {
         stream << x.value << " ";
     }
@@ -411,7 +387,6 @@ std::ostream& operator<<(std::ostream& stream, const Snapshot& snapshot) {
     return stream;
 }
 // ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
 enum LocationType {
     LocationType_X, LocationType_Buffer, LocationType_Block, LocationType_Func
 };
@@ -436,14 +411,14 @@ struct Location {
                     break;
                 case LocationType_Block: {
                         assert(std::holds_alternative<Coord3>(coord));
-                        const auto& coordinates = std::get<Coord3>(coord);
-                        snapshot.blocks[coordinates.x][coordinates.y].update(coordinates.z, number);
+                        const Coord3& coords = std::get<Coord3>(coord);
+                        snapshot.blocks[coords.x][coords.y].update(coords.z, number);
                     }
                     break;
                 case LocationType_Func: {
                         assert(std::holds_alternative<Coord2>(coord));
-                        const auto& coordinates = std::get<Coord2>(coord);
-                        snapshot.funcs[coordinates.x].update(coordinates.y, number);
+                        const Coord2& coords = std::get<Coord2>(coord);
+                        snapshot.funcs[coords.x].update(coords.y, number);
                     }
                     break;
             }
@@ -461,19 +436,19 @@ struct Location {
                     break;
                 case LocationType_Block: {
                         assert(std::holds_alternative<Coord3>(coord));
-                        const auto& coordinates = std::get<Coord3>(coord);
-                        const Block& block = snapshot.blocks[coordinates.x][coordinates.y];
-                        return block[coordinates.z];
+                        const Coord3& coords = std::get<Coord3>(coord);
+                        return snapshot.blocks[coords.x][coords.y][coords.z];
                     }
                     break;
                 case LocationType_Func: {
                         assert(std::holds_alternative<Coord2>(coord));
-                        const auto& coordinates = std::get<Coord2>(coord);
-                        return snapshot.funcs[coordinates.x][coordinates.y];
+                        const Coord2& coords = std::get<Coord2>(coord);
+                        return snapshot.funcs[coords.x][coords.y];
                     }
                     break;
             }
 
+            assert(false && "Switch hasn't handled all cases");
             return EMPTY_NUMBER;
         }
 
@@ -500,13 +475,11 @@ std::ostream& operator<<(std::ostream& stream, const LocationType& locationType)
 
     return stream;
 }
-
 std::ostream& operator<<(std::ostream& stream, const Location& location) {
     stream << "Loc(" << location.type << ", " << location.coord << ")";
 
     return stream;
 }
-
 // ----------------------------------------------------------------------------
 // Unconditional
 struct Action {
@@ -535,43 +508,46 @@ struct Action {
         friend std::ostream& operator<<(std::ostream& stream, const Action& action);
 };
 
-std::ostream& operator<<(std::ostream& stream, const Action& action) {
-    stream << "Act(" << action.location << ", " << action.value << ")";
-
-    return stream;
-}
-std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& v) {
-    for (const Action& a : v) {
-        stream << a << "; ";
-    }
-
-    return stream;
-}
-
-
 void undoActions(Snapshot& snapshot, std::vector<Action>& actions) {
     for (Action& action : actions) {
         action.undo(snapshot);
     }
 }
 
+std::ostream& operator<<(std::ostream& stream, const Action& action) {
+    stream << "Act(" << action.location << ", " << action.value << ")";
 
+    return stream;
+}
+std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& actions) {
+    for (const Action& action : actions) {
+        stream << action << "; ";
+    }
+
+    return stream;
+}
+// ----------------------------------------------------------------------------
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = 9;
+        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 3; // <= NUMBERS_AMOUNT
 
         Location baseLocation;
         std::vector<Action> actions;
-        std::set<Number> triedNumbers;
+        bool triedNumbers[NUMBERS_AMOUNT];
+        unsigned int triedNumbersAmount;
 
     public:
-        Step(const Location& location) : baseLocation(location) {}
+        Step(const Location& location) : baseLocation(location), triedNumbersAmount(0) {
+            memset(triedNumbers, false, NUMBERS_AMOUNT * sizeof(bool));
+            /* for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) { */
+            /*     triedNumbers[i] = false; */
+            /* } */
+        }
 
         void useNumber(const Number& number) {
-            triedNumbers.insert(number);
-            // cleanup(snapshot);
-            // actions.emplace_back(baseLocation, number);
+            if (!triedNumbers[number]) triedNumbersAmount++;
+            triedNumbers[number] = true;
         }
 
         void applyActions(const std::vector<Action>& newActions) {
@@ -579,47 +555,47 @@ struct Step {
         }
 
         void fail(Snapshot& snapshot) {
-            cleanup(snapshot);
-        }
-
-        Location getLocation() const {
-            return baseLocation;
-        }
-
-        bool belowLimit() {
-            return (triedNumbers.size() < ALLOWED_RETRIES);
-        }
-
-        void cleanup(Snapshot& snapshot) {
             for (Action& action : actions) {
                 action.undo(snapshot);
             }
             actions.clear();
         }
 
+        Location getLocation() const {
+            return baseLocation;
+        }
+
+        bool belowLimit() const {
+            return (triedNumbersAmount < ALLOWED_RETRIES);
+        }
+
         std::optional<Number> getUntriedNumber() const {
-            static const unsigned int AMOUNT_OF_TRIES = NUMBERS_IN_VECTOR / 2;
-            for (unsigned int i = 0; i <= AMOUNT_OF_TRIES; i++) {
-                const Number number = generateRandomNumber();
-                if (triedNumbers.find(number) == triedNumbers.end()) {
-                    // This number hasn't beed tried
-                    return {number};
+            if (triedNumbersAmount >= NUMBERS_AMOUNT) return std::nullopt;
+
+            for (unsigned int i = 0; i < 5; i++) {
+                const Number n = generateRandomNumber();
+                if (!triedNumbers[n]) {
+                    return {n};
                 }
             }
-            LOG(std::cout << "Ohno: " << triedNumbers.size() << std::endl;)
 
             return std::nullopt;
+
+            /* std::vector<Number> untriedNumbers; */
+            /* for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) { */
+            /*     if (!triedNumbers[i]) untriedNumbers.emplace_back(i); */
+            /* } */
+            /* return {untriedNumbers[generateRandomUniformInt(0, untriedNumbers.size() - 1)]}; */
         }
 
         friend std::ostream& operator<<(std::ostream& stream, const Step& step);
 };
 
 std::ostream& operator<<(std::ostream& stream, const Step& step) {
-    stream << "Step(" << step.baseLocation << "," << step.actions << "," << step.triedNumbers.size() << ")";
+    stream << "Step(" << step.baseLocation << "," << step.actions << "," << step.triedNumbersAmount << ")";
 
     return stream;
 }
-// ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 class Stack {
     private:
@@ -669,20 +645,6 @@ class Stack {
 
 };
 // ----------------------------------------------------------------------------
-std::ostream& operator<<(std::ostream& stream, const Vector& vector) {
-    if (vector.size() == 0) {
-        return stream;
-    }
-
-    stream << "(";
-    for (unsigned int i = 0; i < vector.size() - 1; i++) {
-        stream << vector[i] << ",";
-    }
-    stream << vector[vector.size() - 1];
-    stream << ")";
-
-    return stream;
-}
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 typedef std::function<std::optional<Location>(unsigned int index, const Snapshot& snapshot, const Functions& funcs)> StrategyFunction;
@@ -729,23 +691,18 @@ std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
     return std::nullopt;
 }
 // ----------------------------------------------------------------------------
-void dumpFuncs(const Functions& funcs) {
-    std::cout << "Funcs:" << std::endl;
+std::ostream& operator<<(std::ostream& stream, const Functions& funcs) {
+    stream << "Funcs:" << std::endl;
     for (unsigned int i = 0; i < Func::SIZE; i++) {
         for (const Func& func : funcs) {
-            std::cout << i << " -> ";
+            stream << i << " -> ";
             const std::string element = (func.emptyAt(i) ?
-                    std::string("_") : std::to_string(func.map[i]));
-            std::cout << element << "\t\t";
+                    std::string("_") : std::to_string(func.at(i)));
+            stream << element << "\t\t";
         }
-        std::cout << std::endl;
+        stream << std::endl;
     }
-    /* for (const Func& f : funcs) { */
-    /*     for (unsigned int i = 0; i <= NUMBER_MAX; i++) { */
-    /*         std::cout << f.at(i) << " "; */
-    /*     } */
-    /*     std::cout << std::endl; */
-    /* } */
+    return stream;
 }
 // ----------------------------------------------------------------------------
 class MagicBox {
@@ -776,25 +733,13 @@ public:
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
-        std::cout << "START" << std::endl;
-        while (generateNewX(xs, y));
-        std::cout << "START2" << std::endl;
-        while (generateNewX(xs, y));
-        std::cout << "START3" << std::endl;
-        while (generateNewX(xs, y));
-        std::cout << "START4" << std::endl;
-        while (generateNewX(xs, y));
-        std::cout << "START5" << std::endl;
-        while (generateNewX(xs, y));
-        std::cout << "START6" << std::endl;
-        while (generateNewX(xs, y));
         outputResult(xs, y);
 
         return xs;
     }
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {
-        LOG(std::cout << ">> Genning new." << std::endl;)
+        LOG(std::cout << ">> Generating new X" << std::endl;)
         Snapshot snapshot(funcs, y);
         Stack stepsStack;
         Strategy strategy([](
@@ -802,7 +747,7 @@ public:
                     const Snapshot& snapshot,
                     const Functions& funcs)
                 -> std::optional<Location> {
-            if (index < NUMBERS_IN_VECTOR) { // first three insertions, index is 0-based
+            if (index < NUMBERS_IN_VECTOR) { // first three insertions
                 return {{LocationType_X, index}};
             } else {
                 if (const std::optional<Coord2> emptyBlock = findEmptyBlock(snapshot)) {
@@ -820,33 +765,34 @@ public:
 
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
-            std::cout << ">> Got next strategy: " << location << "." << std::endl;
+            LOG(std::cout << ">> Got next strategy: " << location << "." << std::endl;)
 
             std::optional<Step> stepOpt{location};
             do {
-                /* LOG(std::cout << "Iteration: " << iter++ << std::endl;) */
-                LOG(std::cout << ">> Inside " << (*stepOpt) << std::endl;)
                 Step& step = *stepOpt;
                 const std::optional<Number> numberOpt = step.getUntriedNumber();
-                if (numberOpt) {
-                    std::cout << "With Number " << (*numberOpt) << std::endl;
-                } else {
-                    std::cout << "With Number " << "*" << std::endl;
+
+                {
+                    LOG(std::cout << ">> Inside " << (*stepOpt) << std::endl;)
+                    LOG(if (numberOpt) { std::cout << "With Number " << (*numberOpt) << std::endl; } else { std::cout << "With Number " << "*" << std::endl; })
+                    LOG(std::cout << snapshot << std::endl;)
                 }
-                std::cout << snapshot << std::endl;
+
                 const std::optional<std::vector<Action>> actionsOpt =
                     (numberOpt) ? (stepOpt->useNumber(*numberOpt), poke(snapshot, step.getLocation(), *numberOpt))
                                 : (std::nullopt);
                 if (numberOpt && actionsOpt) {
-                    std::cout << ">> Success " << std::endl;
-                    std::cout << snapshot << std::endl;
-                    LOG(dumpFuncs(snapshot.funcs);)
+                    {
+                        LOG(std::cout << ">> Success " << std::endl;)
+                        LOG(std::cout << snapshot << std::endl;)
+                        LOG(std::cout << snapshot.funcs;)
+                    }
+
                     step.applyActions(*actionsOpt);
                     stepsStack.push(step);
-
                     stepOpt = std::nullopt;
                 } else {
-                    std::cout << ">> Fail " << std::endl;
+                    LOG(std::cout << ">> Fail " << std::endl;)
                     /* step.fail(snapshot); // inc tries. Never need to empty Actions here */
                     /* std::cout << "Conds: " << (stepOpt ? "true" : "false") << " and " << (!stepOpt->belowLimit() ? "true" : "false") << std::endl; */
                     /* std::cout << "Oopps: " << (stepOpt ? stepOpt->std::endl; */
@@ -870,7 +816,7 @@ public:
         }
 
         // Everything is swell, extract the Xs from snapshot
-        if (!valid(snapshot)) {
+        if (!full(snapshot)) {
             return false;
         }
 
@@ -880,9 +826,9 @@ public:
         }
 
         xs.push_back(extractXs(snapshot));
-        dumpFuncs(snapshot.funcs);
+        LOG(std::cout << snapshot.funcs;)
 
-        return false;
+        return true;
     }
 
 
@@ -898,11 +844,11 @@ public:
         const unsigned int functionIndex = coord.y;
         if (block.full()) {
             LOG(std::cout << "both full, ";)
-            LOG(std::cout << (snapshot.funcs[functionIndex].apply(block.In()) == block.Out() ? "matched" : "no match");)
+            LOG(std::cout << (snapshot.funcs[functionIndex].at(block.In()) == block.Out() ? "matched" : "no match");)
             LOG(std::cout << std::endl;)
-            return snapshot.funcs[functionIndex].apply(block.In()) == block.Out();
+            return snapshot.funcs[functionIndex].at(block.In()) == block.Out();
         } else if (block.emptyOut()) {
-            if (const Number funcRes = snapshot.funcs[functionIndex].apply(block.In());
+            if (const Number funcRes = snapshot.funcs[functionIndex].at(block.In());
                     !emptyNumber(funcRes)) {
                 // can deduce Out from function => try placing Out
                 LOG(std::cout << "Func set for Out. placing Out into Block";)
@@ -934,7 +880,6 @@ public:
         }
 
         LOG(std::cout << "Failed pokeAndInsert" << std::endl;)
-        // LOG(dumpFuncs(snapshot.funcs);)
         return false;
     }
 
@@ -947,7 +892,7 @@ public:
         actions[0].apply(snapshot);
         LOG(std::cout << actions << std::endl;)
         LOG(std::cout << snapshot << std::endl;)
-        LOG(dumpFuncs(snapshot.funcs);)
+        LOG(std::cout << snapshot.funcs;)
 
         switch (location.type) {
             case LocationType_X: // is to poked set only from the outside
@@ -1098,7 +1043,7 @@ public:
 
         // Self Out
         Block& block = snapshot.blocks[rowIndex][columnIndex];
-        const auto& funcRes = snapshot.funcs[columnIndex].apply(number);
+        const auto& funcRes = snapshot.funcs[columnIndex].at(number);
         if (emptyNumber(block.Out())) {
             if (!emptyNumber(funcRes)) {
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
@@ -1304,7 +1249,7 @@ public:
                     std::cout << ":> Usage of empty func entry." << std::endl;
                 }
 
-                number = funcs[funcIndex].apply(number);
+                number = funcs[funcIndex].at(number);
             }
             for (unsigned int funcIndex = 0; funcIndex < layerSize - 1; funcIndex++) {
                 layer[funcIndex] = layer[funcIndex] ^ layer[funcIndex + 1];
@@ -1326,9 +1271,10 @@ public:
 // ----------------------------------------------------------------------------
 void fillRemainingRandom(MagicBox& magicBox) {
     for (Func& func : magicBox.funcs) {
-        for (Number& number : func.map) {
-            if (emptyNumber(number)) {
-                number = getRandomUniformInt(static_cast<unsigned int>(0), Func::SIZE - 1);
+        for (unsigned int i = 0; i < Func::SIZE; i++) {
+            if (func.emptyAt(i)) {
+                // TODO ???
+                func.update(i, generateRandomUniformInt(0, Func::SIZE - 1));
             }
         }
     }
@@ -1336,37 +1282,50 @@ void fillRemainingRandom(MagicBox& magicBox) {
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 int main() {
-    std::cout << "--------------------BEGIN----------------------" << std::endl;
-    srand (314);
+    std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
+    srand (3995);
 
-    const Vector y = generateRandomVector();
     MagicBox mb;
+    const Vector y = generateRandomVector();
     const auto xs = mb.work(y);
     fillRemainingRandom(mb);
-    std::cout << std::endl;
 
 
-    const unsigned int amount = 8 * 8 * 8;
-    std::cout << "Running " << amount << " samples..." << std::endl;
-    for (unsigned int a = 0; a <= NUMBER_MAX; a++) {
-        for (unsigned int b = 0; b <= NUMBER_MAX; b++) {
-            for (unsigned int c = 0; c <= NUMBER_MAX; c++) {
-                Vector x{};
-                x[0] = a;
-                x[1] = b;
-                x[2] = c;
-                const Vector res = mb.apply(x);
-                if (res == y) {
-                    std::cout << "Match! : " << x << std::endl;
-                }
+    std::cout << std::endl << "Checking all possible Xs..." << std::endl;
+    unsigned int counter = 0;
+    std::array<unsigned int, NUMBERS_IN_VECTOR> nextToUse;
+    for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) nextToUse[i] = 0;
+    while (true) {
+        // Construct X
+        Vector x{};
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
+            x[i] = nextToUse[i];
+        }
+
+        // Check
+        if (mb.apply(x) == y) {
+            std::cout << x << " -> " << y << std::endl;
+            counter++;
+        }
+
+        // Prepare for next iteration
+        nextToUse[NUMBERS_IN_VECTOR - 1]++;
+        for (unsigned int i = NUMBERS_IN_VECTOR - 1; i > 0; i--) {
+            if (nextToUse[i] == NUMBERS_AMOUNT) {
+                nextToUse[i-1]++;
+                nextToUse[i] = 0;
             }
         }
+        if (nextToUse[0] == NUMBERS_AMOUNT) {
+            break;
+        }
     }
-    for (unsigned int i = 0; i < amount; i++) {
-    }
-    std::cout << std::endl;
+    std::cout << "The model has (" << counter << ") Xs total" << std::endl;
 
 
-    std::cout << "---------------------END-----------------------" << std::endl;
+    std::cout << std::endl << "---------------------END-----------------------" << std::endl;
     return 0;
 }
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
+// ----------------------------------------------------------------------------
