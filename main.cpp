@@ -18,8 +18,8 @@ static const bool DO_LOG = false;
 #define LOG(x) if(DO_LOG) {x}
 
 
-static const unsigned int NUMBERS_IN_VECTOR = 3;
-static const unsigned int NUMBER_BITS = 3;
+static const unsigned int NUMBERS_IN_VECTOR = 6;
+static const unsigned int NUMBER_BITS = 6;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -180,6 +180,20 @@ struct Func {
 };
 
 typedef std::array<Func, FUNCS_AMOUNT> Functions;
+
+std::ostream& operator<<(std::ostream& stream, const Functions& funcs) {
+    stream << "Funcs:" << std::endl;
+    for (unsigned int i = 0; i < Func::SIZE; i++) {
+        for (const Func& func : funcs) {
+            stream << i << " -> ";
+            const std::string element = (func.emptyAt(i) ?
+                    std::string("_") : std::to_string(func.at(i)));
+            stream << element << "\t\t";
+        }
+        stream << std::endl;
+    }
+    return stream;
+}
 // ----------------------------------------------------------------------------
 struct Cell {
     public:
@@ -343,6 +357,22 @@ bool full(const Snapshot& snapshot) {
     }
 
     return true;
+}
+
+std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
+    unsigned int rowIndex = 0;
+    for (const auto& row : snapshot.blocks) {
+        unsigned int columnIndex = 0;
+        for (const Block& block : row) {
+            if (block.existsEmpty()) {
+                return std::optional<Coord2>{{rowIndex, columnIndex}};
+            }
+            columnIndex++;
+        }
+        rowIndex++;
+    }
+
+    return std::nullopt;
 }
 
 Vector extractXs(const Snapshot& snapshot) {
@@ -530,7 +560,7 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& action
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 3; // <= NUMBERS_AMOUNT
+        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4; // <= NUMBERS_AMOUNT
 
         Location baseLocation;
         std::vector<Action> actions;
@@ -540,9 +570,6 @@ struct Step {
     public:
         Step(const Location& location) : baseLocation(location), triedNumbersAmount(0) {
             memset(triedNumbers, false, NUMBERS_AMOUNT * sizeof(bool));
-            /* for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) { */
-            /*     triedNumbers[i] = false; */
-            /* } */
         }
 
         void useNumber(const Number& number) {
@@ -572,20 +599,11 @@ struct Step {
         std::optional<Number> getUntriedNumber() const {
             if (triedNumbersAmount >= NUMBERS_AMOUNT) return std::nullopt;
 
-            for (unsigned int i = 0; i < 5; i++) {
-                const Number n = generateRandomNumber();
-                if (!triedNumbers[n]) {
-                    return {n};
-                }
+            std::vector<Number> untriedNumbers;
+            for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
+                if (!triedNumbers[i]) untriedNumbers.emplace_back(i);
             }
-
-            return std::nullopt;
-
-            /* std::vector<Number> untriedNumbers; */
-            /* for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) { */
-            /*     if (!triedNumbers[i]) untriedNumbers.emplace_back(i); */
-            /* } */
-            /* return {untriedNumbers[generateRandomUniformInt(0, untriedNumbers.size() - 1)]}; */
+            return { untriedNumbers[generateRandomUniformInt(0, untriedNumbers.size() - 1)] };
         }
 
         friend std::ostream& operator<<(std::ostream& stream, const Step& step);
@@ -604,7 +622,7 @@ class Stack {
     public:
         Stack() {}
 
-        void push(Step step) {
+        void push(const Step& step) {
             steps.push(step);
         }
 
@@ -630,28 +648,13 @@ class Stack {
 
             return std::nullopt;
         }
-
-        /* const Step& top() const { */
-        /*     return steps.top(); */
-        /* } */
-
-        // bool belowLimit() {
-        //     return (steps.top().belowLimit());
-        // }
-
-        void applyActions(const std::vector<Action>& actions) {
-            steps.top().applyActions(actions);
-        }
-
 };
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 typedef std::function<std::optional<Location>(unsigned int index, const Snapshot& snapshot, const Functions& funcs)> StrategyFunction;
 
 class Strategy {
     private:
-        StrategyFunction function;
+        const StrategyFunction function;
         unsigned int nextIndex;
     public:
         Strategy (StrategyFunction function) : function(function), nextIndex(0) {}
@@ -675,36 +678,6 @@ class Strategy {
         }
 };
 // ----------------------------------------------------------------------------
-std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
-    unsigned int rowIndex = 0;
-    unsigned int columnIndex = 0;
-    for (const auto& row : snapshot.blocks) {
-        for (const Block& block : row) {
-            if (block.existsEmpty()) {
-                return std::optional<Coord2>{{rowIndex, columnIndex}};
-            }
-            columnIndex++;
-        }
-        rowIndex++;
-    }
-
-    return std::nullopt;
-}
-// ----------------------------------------------------------------------------
-std::ostream& operator<<(std::ostream& stream, const Functions& funcs) {
-    stream << "Funcs:" << std::endl;
-    for (unsigned int i = 0; i < Func::SIZE; i++) {
-        for (const Func& func : funcs) {
-            stream << i << " -> ";
-            const std::string element = (func.emptyAt(i) ?
-                    std::string("_") : std::to_string(func.at(i)));
-            stream << element << "\t\t";
-        }
-        stream << std::endl;
-    }
-    return stream;
-}
-// ----------------------------------------------------------------------------
 class MagicBox {
 public:
     Functions funcs;
@@ -725,11 +698,6 @@ private:
 public:
     MagicBox() {}
 
-
-    void construct() {
-
-    }
-
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
@@ -739,7 +707,8 @@ public:
     }
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {
-        LOG(std::cout << ">> Generating new X" << std::endl;)
+        static auto counter = 0;
+        std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;
         Snapshot snapshot(funcs, y);
         Stack stepsStack;
         Strategy strategy([](
@@ -756,7 +725,9 @@ public:
                              Coord3(
                                     blockCoord.x,
                                     blockCoord.y,
-                                    snapshot.blocks[blockCoord.x][blockCoord.y].emptyIn() ? BLOCK_IN : BLOCK_OUT)}};
+                                    snapshot.blocks[blockCoord.x][blockCoord.y].emptyIn()
+                                        ? BLOCK_IN
+                                        : BLOCK_OUT)}};
                 } else {
                     return std::nullopt;
                 }
@@ -779,7 +750,8 @@ public:
                 }
 
                 const std::optional<std::vector<Action>> actionsOpt =
-                    (numberOpt) ? (stepOpt->useNumber(*numberOpt), poke(snapshot, step.getLocation(), *numberOpt))
+                    (numberOpt) ? (stepOpt->useNumber(*numberOpt),
+                                    poke(snapshot, step.getLocation(), *numberOpt))
                                 : (std::nullopt);
                 if (numberOpt && actionsOpt) {
                     {
@@ -793,11 +765,8 @@ public:
                     stepOpt = std::nullopt;
                 } else {
                     LOG(std::cout << ">> Fail " << std::endl;)
-                    /* step.fail(snapshot); // inc tries. Never need to empty Actions here */
-                    /* std::cout << "Conds: " << (stepOpt ? "true" : "false") << " and " << (!stepOpt->belowLimit() ? "true" : "false") << std::endl; */
-                    /* std::cout << "Oopps: " << (stepOpt ? stepOpt->std::endl; */
                     while (stepOpt && !stepOpt->belowLimit()) {
-                        stepOpt = stepsStack.pop(); // std::nullopt if stack became empty
+                        stepOpt = stepsStack.pop(); // returns std::nullopt if stack became empty
                         if (stepOpt) {
                             stepOpt->fail(snapshot); // child failed => parent failed. Empty parent's Actions
                         }
@@ -812,20 +781,21 @@ public:
                 }
             } while (stepOpt);
             // (!stepOpt) => a Step succeeded and we need to generate a subsequent
-            // Location (or finish, if no more is to be done).
+            // Location (or finish, if nothing more is to be done).
         }
 
         // Everything is swell, extract the Xs from snapshot
         if (!full(snapshot)) {
+            std::cout << "  Snapshot not full?!" << std::endl;
             return false;
         }
-
         const auto x = extractXs(snapshot);
         if (!unique(x, xs)) {
+            std::cout << "  Not unique!!" << std::endl;
             return false;
         }
+        xs.push_back(x);
 
-        xs.push_back(extractXs(snapshot));
         LOG(std::cout << snapshot.funcs;)
 
         return true;
@@ -1181,22 +1151,20 @@ public:
         const auto& row = snapshot.blocks[rowsAmount];
         const bool bottom = rowIndex == rowsAmount;
         if (columnIndex < row.size() - 1) { // left tail
-            if (const bool successfulProcess = processPairAndInsert(
+            if (!processPairAndInsert(
                         actions,
                         Location(LocationType_Block, Coord3(rowIndex, columnIndex + 1, BLOCK_OUT)),
                         bottom ? Location(LocationType_Buffer, Coord1(columnIndex))
                                : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex, BLOCK_IN)),
-                        number);
-                    !successfulProcess) return false;
+                        number)) return false;
         }
         if (columnIndex >= 1) { // right tail
-            if (const bool successfulProcess = processPairAndInsert(
+            if (!processPairAndInsert(
                         actions,
                         Location(LocationType_Block, Coord3(rowIndex, columnIndex - 1, BLOCK_OUT)),
                         bottom ? Location(LocationType_Buffer, Coord1(columnIndex - 1))
                                : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex - 1, BLOCK_IN)),
-                        number);
-                    !successfulProcess) return false;
+                        number)) return false;
         }
 
         LOG(std::cout << "Succ done PokeOut" << std::endl;)
@@ -1228,7 +1196,6 @@ public:
 
 
     void outputResult(const std::vector<Vector>& xs, const Vector& y) {
-        std::cout << std::endl;
         std::cout << ":> For Y " << y << " the following Xs were generated (" << xs.size() << "):" << std::endl;
         for (const Vector& x : xs) {
             std::cout << x << std::endl;
@@ -1283,7 +1250,7 @@ void fillRemainingRandom(MagicBox& magicBox) {
 // ----------------------------------------------------------------------------
 int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
-    srand (3995);
+    srand (309);
 
     MagicBox mb;
     const Vector y = generateRandomVector();
