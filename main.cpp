@@ -904,7 +904,7 @@ public:
         assert(snapshot.blocks[0][index].emptyIn() && ":> IN not empty when X got poked.");
         if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
                     LocationType::Block,
-                    Coord3(0, index, BlockCell::OUT),
+                    Coord3(0, index, BlockCell::IN),
                     number);
                 !successfulPoke) return false;
 
