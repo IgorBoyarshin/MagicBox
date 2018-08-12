@@ -5,7 +5,7 @@ classFiles =
 # Files that only have the .h version
 justHeaderFiles =
 # Compilation flags
-OPTIMIZATION_FLAG = -O2
+OPTIMIZATION_FLAG = -O0
 LANGUAGE_LEVEL = -std=c++17
 COMPILER_FLAGS = -Wall -Wextra -Wno-unused-parameter
 LINKER_FLAGS =

@@ -16,10 +16,9 @@
 // ----------------------------------------------------------------------------
 static const bool DO_LOG = false;
 #define LOG(x) if(DO_LOG) {x}
-
-
-static const unsigned int NUMBERS_IN_VECTOR = 6;
-static const unsigned int NUMBER_BITS = 6;
+// ----------------------------------------------------------------------------
+static const unsigned int NUMBERS_IN_VECTOR = 4;
+static const unsigned int NUMBER_BITS = 4;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -30,11 +29,11 @@ typedef unsigned int Number;
 typedef std::array<Number, NUMBERS_IN_VECTOR> Vector;
 
 
-Number XOR(const Number& a, const Number& b) {
+inline Number XOR(const Number& a, const Number& b) {
     return a ^ b;
 }
 
-bool emptyNumber(const Number& number) {
+inline bool emptyNumber(const Number& number) {
     return (number == EMPTY_NUMBER);
 }
 
@@ -708,7 +707,7 @@ public:
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {
         static auto counter = 0;
-        std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;
+        LOG(std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;)
         Snapshot snapshot(funcs, y);
         Stack stepsStack;
         Strategy strategy([](
@@ -1152,19 +1151,19 @@ public:
         const bool bottom = rowIndex == rowsAmount;
         if (columnIndex < row.size() - 1) { // left tail
             if (!processPairAndInsert(
-                        actions,
-                        Location(LocationType_Block, Coord3(rowIndex, columnIndex + 1, BLOCK_OUT)),
-                        bottom ? Location(LocationType_Buffer, Coord1(columnIndex))
-                               : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex, BLOCK_IN)),
-                        number)) return false;
+                    actions,
+                    Location(LocationType_Block, Coord3(rowIndex, columnIndex + 1, BLOCK_OUT)),
+                    bottom ? Location(LocationType_Buffer, Coord1(columnIndex))
+                           : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex, BLOCK_IN)),
+                    number)) return false;
         }
         if (columnIndex >= 1) { // right tail
             if (!processPairAndInsert(
-                        actions,
-                        Location(LocationType_Block, Coord3(rowIndex, columnIndex - 1, BLOCK_OUT)),
-                        bottom ? Location(LocationType_Buffer, Coord1(columnIndex - 1))
-                               : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex - 1, BLOCK_IN)),
-                        number)) return false;
+                    actions,
+                    Location(LocationType_Block, Coord3(rowIndex, columnIndex - 1, BLOCK_OUT)),
+                    bottom ? Location(LocationType_Buffer, Coord1(columnIndex - 1))
+                           : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex - 1, BLOCK_IN)),
+                    number)) return false;
         }
 
         LOG(std::cout << "Succ done PokeOut" << std::endl;)
@@ -1234,8 +1233,6 @@ public:
     }
 };
 // ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
 void fillRemainingRandom(MagicBox& magicBox) {
     for (Func& func : magicBox.funcs) {
         for (unsigned int i = 0; i < Func::SIZE; i++) {
@@ -1246,7 +1243,6 @@ void fillRemainingRandom(MagicBox& magicBox) {
         }
     }
 }
-// ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
@@ -1293,6 +1289,3 @@ int main() {
     std::cout << std::endl << "---------------------END-----------------------" << std::endl;
     return 0;
 }
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
-// ----------------------------------------------------------------------------
