@@ -789,7 +789,7 @@ public:
         }
         const auto x = extractXs(snapshot);
         if (!unique(x, xs)) {
-            std::cout << "  Not unique!!" << std::endl;
+            LOG(std::cout << "  Not unique!!" << std::endl;)
             return false;
         }
         xs.push_back(x);
