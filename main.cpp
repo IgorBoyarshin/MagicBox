@@ -17,37 +17,60 @@
 static const bool DO_LOG = false;
 #define LOG(x) if(DO_LOG) {x}
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 4;
-static const unsigned int NUMBER_BITS = 4;
+static const unsigned int NUMBERS_IN_VECTOR = 3;
+static const unsigned int NUMBER_BITS = 3;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 static const unsigned int EMPTY_NUMBER = NUMBER_MAX + 1;
 static const unsigned int FUNCS_AMOUNT = 2 * NUMBERS_IN_VECTOR - 1;
 // ----------------------------------------------------------------------------
-typedef unsigned int Number;
+struct Number {
+    unsigned int value;
+
+    Number() : value(EMPTY_NUMBER) {}
+    Number(unsigned int value) : value(value) {}
+
+    inline bool empty() const { return value == EMPTY_NUMBER; };
+    inline unsigned int operator()() const { return value; }
+    inline bool operator==(const Number& other) const { return value == other(); };
+    inline bool operator!=(const Number& other) const { return value != other(); };
+};
+
+std::ostream& operator<<(std::ostream& stream, const Number& number) {
+    if (number.empty()) {
+        stream << "*";
+    } else {
+        stream << number();
+    }
+
+    return stream;
+}
+
 typedef std::array<Number, NUMBERS_IN_VECTOR> Vector;
 
 
 inline Number XOR(const Number& a, const Number& b) {
-    return a ^ b;
+    return a() ^ b();
 }
 
-inline bool emptyNumber(const Number& number) {
-    return (number == EMPTY_NUMBER);
+bool operator==(const Vector& v1, const Vector& v2) {
+    for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
+        if (v1[i] != v2[i]) {
+            return false;
+        }
+    }
+
+    return true;
+};
+
+bool operator!=(const Vector& v1, const Vector& v2) {
+    return !(operator==(v1, v2));
 }
 
 bool unique(const Vector& vector, const std::vector<Vector>& xs) {
     for (const Vector& x : xs) {
-        bool allSame = true;
-        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
-            if (vector[i] != x[i]) {
-                allSame = false;
-                break;
-            }
-        }
-
-        if (allSame) {
+        if (vector == x) {
             return false;
         }
     }
@@ -98,6 +121,124 @@ Vector generateRandomVector() {
     return vector;
 }
 // ----------------------------------------------------------------------------
+struct Func {
+    public:
+        static const unsigned int SIZE = NUMBERS_AMOUNT;
+
+    private:
+        // num_in -> num_out
+        Number map[SIZE];
+
+    public:
+        Func() {
+            for (unsigned int i = 0; i < SIZE; i++) map[i] = Number(EMPTY_NUMBER);
+        }
+
+        bool setAt(const Number& arg) const {
+            return (!map[arg()].empty());
+        }
+
+        bool emptyAt(const Number& arg) const {
+            return (map[arg()].empty());
+        }
+
+        void update(const Number& arg, const Number& value) {
+            map[arg()] = value;
+        }
+
+        const Number& at(const Number& arg) const {
+            return map[arg()];
+        }
+
+        const Number& operator[](const Number& arg) const {
+            return map[arg()];
+        }
+};
+
+typedef std::array<Func, FUNCS_AMOUNT> Functions;
+
+std::ostream& operator<<(std::ostream& stream, const Functions& funcs) {
+    stream << "Funcs:" << std::endl;
+    for (unsigned int i = 0; i < Func::SIZE; i++) {
+        for (const Func& func : funcs) {
+            stream << i << " -> " << func.at(i) << "\t\t";
+        }
+        stream << std::endl;
+    }
+
+    return stream;
+}
+// ----------------------------------------------------------------------------
+enum class BlockCell {
+    IN, OUT
+};
+
+std::ostream& operator<<(std::ostream& stream, const BlockCell& blockCell) {
+    switch (blockCell) {
+        case BlockCell::IN:
+            stream << "IN";
+            break;
+        case BlockCell::OUT:
+            stream << "OUT";
+            break;
+    }
+
+    return stream;
+}
+
+struct Block {
+    private:
+        Number in;
+        Number out;
+
+        Number& at(BlockCell blockCell) {
+            return (blockCell == BlockCell::IN) ? in : out;
+        }
+
+        const Number& at(BlockCell blockCell) const {
+            return (blockCell == BlockCell::IN) ? in : out;
+        }
+
+    public:
+        Block() : in(EMPTY_NUMBER), out(EMPTY_NUMBER) {}
+
+        bool existsEmpty() const {
+            return !full();
+        }
+
+        bool empty() const {
+            return (in.empty() && out.empty());
+        }
+
+        bool emptyIn() const {
+            return in.empty();
+        }
+
+        bool emptyOut() const {
+            return out.empty();
+        }
+
+        bool full() const {
+            return (!in.empty() && !out.empty());
+        }
+
+        const Number& operator[](BlockCell blockCell) const {
+            return at(blockCell);
+        }
+
+        const Number& In() const {
+            return in;
+        }
+
+        const Number& Out() const {
+            return out;
+        }
+
+        void update(BlockCell blockCell, const Number& number) {
+            at(blockCell) = number;
+        }
+};
+// ----------------------------------------------------------------------------
 struct Coord1 {
     public:
         unsigned int x;
@@ -115,9 +256,9 @@ struct Coord3 {
     public:
         unsigned int x;
         unsigned int y;
-        unsigned int z;
+        BlockCell z;
 
-        Coord3(unsigned int x, unsigned int y, unsigned int z) : x(x), y(y), z(z) {}
+        Coord3(unsigned int x, unsigned int y, BlockCell z) : x(x), y(y), z(z) {}
 };
 
 
@@ -144,136 +285,14 @@ std::ostream& operator<<(std::ostream& stream, const std::variant<Coord1, Coord2
     return stream;
 }
 // ----------------------------------------------------------------------------
-struct Func {
-    public:
-        static const unsigned int SIZE = NUMBERS_AMOUNT;
-
-    private:
-        // num_in -> num_out
-        Number map[SIZE];
-
-    public:
-        Func() {
-            for (unsigned int i = 0; i < SIZE; i++) map[i] = EMPTY_NUMBER;
-        }
-
-        bool setAt(const Number& arg) const {
-            return (map[arg] != EMPTY_NUMBER);
-        }
-
-        bool emptyAt(const Number& arg) const {
-            return (map[arg] == EMPTY_NUMBER);
-        }
-
-        void update(const Number& arg, const Number& value) {
-            map[arg] = value;
-        }
-
-        const Number& at(const Number& arg) const {
-            return map[arg];
-        }
-
-        const Number& operator[](const Number& index) const {
-            return map[index];
-        }
-};
-
-typedef std::array<Func, FUNCS_AMOUNT> Functions;
-
-std::ostream& operator<<(std::ostream& stream, const Functions& funcs) {
-    stream << "Funcs:" << std::endl;
-    for (unsigned int i = 0; i < Func::SIZE; i++) {
-        for (const Func& func : funcs) {
-            stream << i << " -> ";
-            const std::string element = (func.emptyAt(i) ?
-                    std::string("_") : std::to_string(func.at(i)));
-            stream << element << "\t\t";
-        }
-        stream << std::endl;
-    }
-    return stream;
-}
-// ----------------------------------------------------------------------------
-struct Cell {
-    public:
-        Number value;
-
-        Cell() : value(EMPTY_NUMBER) {}
-
-        Cell(const Number& value) : value(value) {}
-
-        bool empty() const {
-            return emptyNumber(value);
-        }
-};
-// ----------------------------------------------------------------------------
-static const unsigned int BLOCK_IN = 0;
-static const unsigned int BLOCK_OUT = 1;
-
-struct Block {
-    private:
-        Number in;
-        Number out;
-
-        Number& at(unsigned int index) {
-            assert(index <= 1);
-            return (index == BLOCK_IN) ? in : out;
-        }
-
-        const Number& at(unsigned int index) const {
-            assert(index <= 1);
-            return (index == BLOCK_IN) ? in : out;
-        }
-
-
-    public:
-        Block() : in(EMPTY_NUMBER), out(EMPTY_NUMBER) {}
-
-        bool existsEmpty() const {
-            return !full();
-        }
-
-        bool empty() const {
-            return (in == EMPTY_NUMBER) && (out == EMPTY_NUMBER);
-        }
-
-        bool emptyIn() const {
-            return (in == EMPTY_NUMBER);
-        }
-
-        bool emptyOut() const {
-            return (out == EMPTY_NUMBER);
-        }
-
-        bool full() const {
-            return (in != EMPTY_NUMBER) && (out != EMPTY_NUMBER);
-        }
-
-        const Number& operator[](unsigned int index) const {
-            return at(index);
-        }
-
-        const Number& In() const {
-            return in;
-        }
-
-        const Number& Out() const {
-            return out;
-        }
-
-        void update(unsigned int index, const Number& number) {
-            at(index) = number;
-        }
-};
-// ----------------------------------------------------------------------------
 class Snapshot {
     public:
         Functions& funcs;
 
         std::vector<std::vector<Block>> blocks;
-        std::array<Cell, NUMBERS_IN_VECTOR> buffers;
-        std::array<Cell, NUMBERS_IN_VECTOR> xs;
-        const std::array<Cell, NUMBERS_IN_VECTOR> ys;
+        std::array<Number, NUMBERS_IN_VECTOR> buffers;
+        std::array<Number, NUMBERS_IN_VECTOR> xs;
+        const std::array<Number, NUMBERS_IN_VECTOR> ys;
 
     private:
         void init() {
@@ -292,18 +311,8 @@ class Snapshot {
             }
         }
 
-        static std::array<Cell, NUMBERS_IN_VECTOR> convertVectorToCells(const Vector& vector) {
-            std::array<Cell, NUMBERS_IN_VECTOR> cells;
-            for (unsigned int i = 0; i < vector.size(); i++) {
-                cells[i] = Cell(vector[i]);
-            }
-
-            return cells;
-        }
-
     public:
-        Snapshot(Functions& funcs, const Vector& ys)
-                : funcs(funcs), ys(convertVectorToCells(ys)) {
+        Snapshot(Functions& funcs, const Vector& ys) : funcs(funcs), ys(ys) {
             init();
         }
 
@@ -315,12 +324,12 @@ class Snapshot {
                     }
                 }
             }
-            for (const Cell& buffer : buffers) {
+            for (const Number& buffer : buffers) {
                 if (buffer.empty()) {
                     return true;
                 }
             }
-            for (const Cell& x : xs) {
+            for (const Number& x : xs) {
                 if (x.empty()) {
                     return true;
                 }
@@ -333,12 +342,12 @@ class Snapshot {
 
 bool full(const Snapshot& snapshot) {
     for (const auto& x : snapshot.xs) {
-        if (emptyNumber(x.value)) {
+        if (x.empty()) {
             return false;
         }
     }
     for (const auto& b : snapshot.buffers) {
-        if (emptyNumber(b.value)) {
+        if (b.empty()) {
             return false;
         }
     }
@@ -350,7 +359,7 @@ bool full(const Snapshot& snapshot) {
         }
     }
     for (const auto& y : snapshot.ys) {
-        if (emptyNumber(y.value)) {
+        if (y.empty()) {
             return false;
         }
     }
@@ -375,13 +384,7 @@ std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
 }
 
 Vector extractXs(const Snapshot& snapshot) {
-    Vector vector;
-    for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
-        const Cell& cell = snapshot.xs[i];
-        vector[i] = cell.value;
-    }
-
-    return vector;
+    return snapshot.xs;
 }
 
 
@@ -416,8 +419,8 @@ std::ostream& operator<<(std::ostream& stream, const Snapshot& snapshot) {
     return stream;
 }
 // ----------------------------------------------------------------------------
-enum LocationType {
-    LocationType_X, LocationType_Buffer, LocationType_Block, LocationType_Func
+enum class LocationType {
+    X, Buffer, Block, Func
 };
 
 struct Location {
@@ -430,21 +433,21 @@ struct Location {
 
         void place(const Number& number, Snapshot& snapshot) const {
             switch (type) {
-                case LocationType_X:
+                case LocationType::X:
                     assert(std::holds_alternative<Coord1>(coord));
                     snapshot.xs[std::get<Coord1>(coord).x] = number;
                     break;
-                case LocationType_Buffer:
+                case LocationType::Buffer:
                     assert(std::holds_alternative<Coord1>(coord));
                     snapshot.buffers[std::get<Coord1>(coord).x] = number;
                     break;
-                case LocationType_Block: {
+                case LocationType::Block: {
                         assert(std::holds_alternative<Coord3>(coord));
                         const Coord3& coords = std::get<Coord3>(coord);
                         snapshot.blocks[coords.x][coords.y].update(coords.z, number);
                     }
                     break;
-                case LocationType_Func: {
+                case LocationType::Func: {
                         assert(std::holds_alternative<Coord2>(coord));
                         const Coord2& coords = std::get<Coord2>(coord);
                         snapshot.funcs[coords.x].update(coords.y, number);
@@ -455,21 +458,21 @@ struct Location {
 
         const Number& value(Snapshot& snapshot) const {
             switch (type) {
-                case LocationType_X:
+                case LocationType::X:
                     assert(std::holds_alternative<Coord1>(coord));
-                    return snapshot.xs[std::get<Coord1>(coord).x].value;
+                    return snapshot.xs[std::get<Coord1>(coord).x];
                     break;
-                case LocationType_Buffer:
+                case LocationType::Buffer:
                     assert(std::holds_alternative<Coord1>(coord));
-                    return snapshot.buffers[std::get<Coord1>(coord).x].value;
+                    return snapshot.buffers[std::get<Coord1>(coord).x];
                     break;
-                case LocationType_Block: {
+                case LocationType::Block: {
                         assert(std::holds_alternative<Coord3>(coord));
                         const Coord3& coords = std::get<Coord3>(coord);
                         return snapshot.blocks[coords.x][coords.y][coords.z];
                     }
                     break;
-                case LocationType_Func: {
+                case LocationType::Func: {
                         assert(std::holds_alternative<Coord2>(coord));
                         const Coord2& coords = std::get<Coord2>(coord);
                         return snapshot.funcs[coords.x][coords.y];
@@ -477,28 +480,28 @@ struct Location {
                     break;
             }
 
-            assert(false && "Switch hasn't handled all cases");
-            return EMPTY_NUMBER;
+            assert(false && "Switch didn't handle all cases.");
+            return snapshot.xs[0]; // invalid number!!! (just to return smth)
         }
 
         bool empty(Snapshot& snapshot) const {
-            return (emptyNumber(value(snapshot)));
+            return (value(snapshot).empty());
         }
 };
 
 std::ostream& operator<<(std::ostream& stream, const LocationType& locationType) {
     switch (locationType) {
-        case LocationType_X:
-            stream << "LocationType_X";
+        case LocationType::X:
+            stream << "LocationType::X";
             break;
-        case LocationType_Buffer:
-            stream << "LocationType_Buffer";
+        case LocationType::Buffer:
+            stream << "LocationType::Buffer";
             break;
-        case LocationType_Block:
-            stream << "LocationType_Block";
+        case LocationType::Block:
+            stream << "LocationType::Block";
             break;
-        case LocationType_Func:
-            stream << "LocationType_Func";
+        case LocationType::Func:
+            stream << "LocationType::Func";
             break;
     }
 
@@ -559,7 +562,7 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& action
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4; // <= NUMBERS_AMOUNT
+        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT; // <= NUMBERS_AMOUNT
 
         Location baseLocation;
         std::vector<Action> actions;
@@ -572,8 +575,8 @@ struct Step {
         }
 
         void useNumber(const Number& number) {
-            if (!triedNumbers[number]) triedNumbersAmount++;
-            triedNumbers[number] = true;
+            if (!triedNumbers[number()]) triedNumbersAmount++;
+            triedNumbers[number()] = true;
         }
 
         void applyActions(const std::vector<Action>& newActions) {
@@ -596,7 +599,7 @@ struct Step {
         }
 
         std::optional<Number> getUntriedNumber() const {
-            if (triedNumbersAmount >= NUMBERS_AMOUNT) return std::nullopt;
+            if (triedNumbersAmount >= ALLOWED_RETRIES) return std::nullopt;
 
             std::vector<Number> untriedNumbers;
             for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
@@ -619,8 +622,6 @@ class Stack {
         std::stack<Step> steps;
 
     public:
-        Stack() {}
-
         void push(const Step& step) {
             steps.push(step);
         }
@@ -681,22 +682,20 @@ class MagicBox {
 public:
     Functions funcs;
 
-    Func& operator[](unsigned int index) {
-        return funcs[index];
-    }
-
-    const Func& operator[](unsigned int index) const {
-        return funcs[index];
-    }
+    // Func& operator[](unsigned int index) {
+    //     return funcs[index];
+    // }
+    //
+    // const Func& operator[](unsigned int index) const {
+    //     return funcs[index];
+    // }
 
 private:
-    bool numberHasSecondaryIn(unsigned int index) const {
+    bool hasSecondaryIn(unsigned int index) const {
         return (index < NUMBERS_IN_VECTOR - 1);
     }
 
 public:
-    MagicBox() {}
-
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
@@ -716,17 +715,17 @@ public:
                     const Functions& funcs)
                 -> std::optional<Location> {
             if (index < NUMBERS_IN_VECTOR) { // first three insertions
-                return {{LocationType_X, index}};
+                return { {LocationType::X, {index}} };
             } else {
                 if (const std::optional<Coord2> emptyBlock = findEmptyBlock(snapshot)) {
                     const Coord2& blockCoord = *emptyBlock;
-                    return {{LocationType_Block,
+                    return {{LocationType::Block,
                              Coord3(
                                     blockCoord.x,
                                     blockCoord.y,
                                     snapshot.blocks[blockCoord.x][blockCoord.y].emptyIn()
-                                        ? BLOCK_IN
-                                        : BLOCK_OUT)}};
+                                        ? BlockCell::IN
+                                        : BlockCell::OUT)}};
                 } else {
                     return std::nullopt;
                 }
@@ -790,7 +789,7 @@ public:
         }
         const auto x = extractXs(snapshot);
         if (!unique(x, xs)) {
-            std::cout << "  Not unique!!" << std::endl;
+            LOG(std::cout << "  Not unique!!" << std::endl;)
             return false;
         }
         xs.push_back(x);
@@ -818,12 +817,12 @@ public:
             return snapshot.funcs[functionIndex].at(block.In()) == block.Out();
         } else if (block.emptyOut()) {
             if (const Number funcRes = snapshot.funcs[functionIndex].at(block.In());
-                    !emptyNumber(funcRes)) {
+                    !funcRes.empty()) {
                 // can deduce Out from function => try placing Out
                 LOG(std::cout << "Func set for Out. placing Out into Block";)
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_Block,
-                            Coord3(coord.x, coord.y, BLOCK_OUT),
+                            LocationType::Block,
+                            Coord3(coord.x, coord.y, BlockCell::OUT),
                             funcRes);
                         !successfulPoke) return false;
             }
@@ -864,29 +863,29 @@ public:
         LOG(std::cout << snapshot.funcs;)
 
         switch (location.type) {
-            case LocationType_X: // is to poked set only from the outside
+            case LocationType::X: // is to poked set only from the outside
                 if (const auto successfulPoke = pokeX(snapshot, actions, location, number);
                         !successfulPoke) return (undoActions(snapshot, actions), std::nullopt);
                 break;
-            case LocationType_Buffer:
+            case LocationType::Buffer:
                 if (const auto successfulPoke = pokeBuffer(snapshot, actions, location, number);
                         !successfulPoke) return (undoActions(snapshot, actions), std::nullopt);
                 break;
-            case LocationType_Block:
+            case LocationType::Block:
                 assert(std::holds_alternative<Coord3>(location.coord));
                 switch (const Coord3 coord = std::get<Coord3>(location.coord);
                         coord.z) {
-                    case BLOCK_IN:
+                    case BlockCell::IN:
                         if (const auto successfulPoke = pokeFuncIn(snapshot, actions, location, number);
                                 !successfulPoke) return (undoActions(snapshot, actions), std::nullopt);
                         break;
-                    case BLOCK_OUT:
+                    case BlockCell::OUT:
                         if (const auto successfulPoke = pokeFuncOut(snapshot, actions, location, number);
                                 !successfulPoke) return (undoActions(snapshot, actions), std::nullopt);
                         break;
                 }
                 break;
-            case LocationType_Func:
+            case LocationType::Func:
                 assert(false && "Why would you poke a Func???");
                 break;
         }
@@ -904,17 +903,17 @@ public:
         // Main In
         assert(snapshot.blocks[0][index].emptyIn() && ":> IN not empty when X got poked.");
         if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                    LocationType_Block,
-                    Coord3(0, index, BLOCK_IN),
+                    LocationType::Block,
+                    Coord3(0, index, BlockCell::OUT),
                     number);
                 !successfulPoke) return false;
 
         // Secondary In
-        if (numberHasSecondaryIn(index)) {
+        if (hasSecondaryIn(index)) {
             assert(snapshot.blocks[0][index + NUMBERS_IN_VECTOR].emptyIn() && ":> Secondary IN not empty when X got poked.");
             if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                        LocationType_Block,
-                        Coord3(0, index + NUMBERS_IN_VECTOR, BLOCK_IN),
+                        LocationType::Block,
+                        Coord3(0, index + NUMBERS_IN_VECTOR, BlockCell::IN),
                         number);
                     !successfulPoke) return false;
         }
@@ -923,7 +922,7 @@ public:
         /* assert(snapshot.buffers[index].empty() && ":> Buffer not empty when X got poked."); */
         if (snapshot.buffers[index].empty()) {
             if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                        LocationType_Buffer,
+                        LocationType::Buffer,
                         Coord1(index),
                         XOR(number, snapshot.ys[index].value));
                     !successfulPoke) return false;
@@ -950,25 +949,25 @@ public:
         }
         if (snapshot.xs[index].empty()) {
             // just set X, but never poke it
-            actions.emplace_back(Location(LocationType_X, Coord1(index)), numberX);
+            actions.emplace_back(Location(LocationType::X, Coord1(index)), numberX);
             (actions.end() - 1)->apply(snapshot);
         }
 
         // Main In
         if (snapshot.blocks[0][index].emptyIn()) {
             if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                        LocationType_Block,
-                        Coord3(0, index, BLOCK_IN),
+                        LocationType::Block,
+                        Coord3(0, index, BlockCell::IN),
                         numberX);
                     !successfulPoke) return false;
         }
 
         // Secondary In
-        if (numberHasSecondaryIn(index)) {
+        if (hasSecondaryIn(index)) {
             if (snapshot.blocks[0][index + NUMBERS_IN_VECTOR].emptyIn()) {
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_Block,
-                            Coord3(0, index + NUMBERS_IN_VECTOR, BLOCK_IN),
+                            LocationType::Block,
+                            Coord3(0, index + NUMBERS_IN_VECTOR, BlockCell::IN),
                             numberX);
                         !successfulPoke) return false;
             }
@@ -987,14 +986,14 @@ public:
         }
         if (block1.emptyOut() && !block2.emptyOut()) {
             if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                        LocationType_Block,
-                        Coord3(lastRowIndex, index, BLOCK_OUT),
+                        LocationType::Block,
+                        Coord3(lastRowIndex, index, BlockCell::OUT),
                         XOR(number, block2.Out()));
                     !successfulPoke) return false;
         } else if (block1.emptyOut() && !block2.emptyOut()) {
             if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                        LocationType_Block,
-                        Coord3(lastRowIndex, index + 1, BLOCK_OUT),
+                        LocationType::Block,
+                        Coord3(lastRowIndex, index + 1, BlockCell::OUT),
                         XOR(number, block1.Out()));
                     !successfulPoke) return false;
         }
@@ -1013,16 +1012,16 @@ public:
         // Self Out
         Block& block = snapshot.blocks[rowIndex][columnIndex];
         const auto& funcRes = snapshot.funcs[columnIndex].at(number);
-        if (emptyNumber(block.Out())) {
-            if (!emptyNumber(funcRes)) {
+        if (block.Out().empty()) {
+            if (!funcRes.empty()) {
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_Block,
-                            Coord3(rowIndex, columnIndex, BLOCK_OUT),
+                            LocationType::Block,
+                            Coord3(rowIndex, columnIndex, BlockCell::OUT),
                             funcRes);
                         !successfulPoke) return false;
             }
         } else {
-            if (emptyNumber(funcRes)) {
+            if (funcRes.empty()) {
                 if (const auto successfulSet = setFuncAndPokeColumnAndInsert(snapshot, actions,
                             Coord2(rowIndex, columnIndex));
                         !successfulSet) return false;
@@ -1040,7 +1039,7 @@ public:
                            : (columnIndex - NUMBERS_IN_VECTOR);
             if (snapshot.xs[xIndex].empty()) {
                 // Set X (just set, never poke)
-                actions.emplace_back(Location(LocationType_X, Coord1(xIndex)), number);
+                actions.emplace_back(Location(LocationType::X, Coord1(xIndex)), number);
                 (actions.end() - 1)->apply(snapshot);
 
                 // Set INs
@@ -1048,19 +1047,19 @@ public:
                     (isMainIn) ? (columnIndex + NUMBERS_IN_VECTOR)
                                : (columnIndex - NUMBERS_IN_VECTOR);
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_X,
+                            LocationType::X,
                             Coord1(otherColumnIndex),
                             number);
                         !successfulPoke) return false;
 
                 // Set Buffer
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_Buffer,
+                            LocationType::Buffer,
                             Coord1(columnIndex),
                             number);
                         !successfulPoke) return false;
             } else {
-                if (snapshot.xs[xIndex].value != number) {
+                if (snapshot.xs[xIndex] != number) {
                     return false;
                 }
             }
@@ -1077,14 +1076,14 @@ public:
             }
             if (block1.emptyOut() && !block2.emptyOut()) {
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_Block,
-                            Coord3(rowIndex - 1, columnIndex, BLOCK_OUT),
+                            LocationType::Block,
+                            Coord3(rowIndex - 1, columnIndex, BlockCell::OUT),
                             XOR(number, block2.Out()));
                         !successfulPoke) return false;
             } else if (block1.emptyOut() && !block2.emptyOut()) {
                 if (const bool successfulPoke = pokeAndInsert(snapshot, actions,
-                            LocationType_Block,
-                            Coord3(rowIndex - 1, columnIndex + 1, BLOCK_OUT),
+                            LocationType::Block,
+                            Coord3(rowIndex - 1, columnIndex + 1, BlockCell::OUT),
                             XOR(number, block1.Out()));
                         !successfulPoke) return false;
             }
@@ -1105,7 +1104,7 @@ public:
         if (const auto& block = snapshot.blocks[rowIndex][columnIndex];
                 !block.emptyIn()) {
             if (const auto& funcRes = snapshot.funcs[columnIndex].at(block.In());
-                    !emptyNumber(funcRes)) {
+                    !funcRes.empty()) {
                 if (funcRes != number) {
                     return false;
                 }
@@ -1152,17 +1151,17 @@ public:
         if (columnIndex < row.size() - 1) { // left tail
             if (!processPairAndInsert(
                     actions,
-                    Location(LocationType_Block, Coord3(rowIndex, columnIndex + 1, BLOCK_OUT)),
-                    bottom ? Location(LocationType_Buffer, Coord1(columnIndex))
-                           : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex, BLOCK_IN)),
+                    Location(LocationType::Block, Coord3(rowIndex, columnIndex + 1, BlockCell::OUT)),
+                    bottom ? Location(LocationType::Buffer, Coord1(columnIndex))
+                           : Location(LocationType::Block, Coord3(rowIndex + 1, columnIndex, BlockCell::IN)),
                     number)) return false;
         }
         if (columnIndex >= 1) { // right tail
             if (!processPairAndInsert(
                     actions,
-                    Location(LocationType_Block, Coord3(rowIndex, columnIndex - 1, BLOCK_OUT)),
-                    bottom ? Location(LocationType_Buffer, Coord1(columnIndex - 1))
-                           : Location(LocationType_Block, Coord3(rowIndex + 1, columnIndex - 1, BLOCK_IN)),
+                    Location(LocationType::Block, Coord3(rowIndex, columnIndex - 1, BlockCell::OUT)),
+                    bottom ? Location(LocationType::Buffer, Coord1(columnIndex - 1))
+                           : Location(LocationType::Block, Coord3(rowIndex + 1, columnIndex - 1, BlockCell::IN)),
                     number)) return false;
         }
 
@@ -1176,9 +1175,11 @@ public:
         const auto& block = snapshot.blocks[blockCoord.x][blockCoord.y];
         assert(snapshot.funcs[blockCoord.y].emptyAt(block.In()));
 
-        actions.emplace_back(Location(LocationType_Func, Coord2(blockCoord.y, block.In())), block.Out()); // set func
+        // set func
+        actions.emplace_back(
+                Location(LocationType::Func, Coord2(blockCoord.y, block.In().value)),
+                block.Out());
         (actions.end() - 1)->apply(snapshot);
-        /* snapshot.funcs[blockCoord.y].update(block.In(), block.Out()); // set func */
 
         // func for this column has beed altered => poke all Blocks in this column
         for (unsigned int row = 0; row < ((blockCoord.y <= NUMBERS_IN_VECTOR) ? (snapshot.blocks.size()) : (snapshot.blocks.size() + NUMBERS_IN_VECTOR - blockCoord.y)); row++) {
@@ -1218,12 +1219,12 @@ public:
                 number = funcs[funcIndex].at(number);
             }
             for (unsigned int funcIndex = 0; funcIndex < layerSize - 1; funcIndex++) {
-                layer[funcIndex] = layer[funcIndex] ^ layer[funcIndex + 1];
+                layer[funcIndex] = XOR(layer[funcIndex], layer[funcIndex + 1]);
             }
         }
 
         for (unsigned int funcIndex = 0; funcIndex < NUMBERS_IN_VECTOR; funcIndex++) {
-            layer[funcIndex] = layer[funcIndex] ^ input[funcIndex];
+            layer[funcIndex] = XOR(layer[funcIndex], input[funcIndex]);
         }
 
         Vector output;
