@@ -304,16 +304,6 @@ class Snapshot {
         std::array<Number, NUMBERS_IN_VECTOR> xs;
         const std::array<Number, NUMBERS_IN_VECTOR> ys;
 
-        long long xsPresence = 0;
-        const long long allXsPresent = (1 << NUMBERS_IN_VECTOR) - 1;
-        bool xsHaveChanged = false;
-
-        inline void flipXsPresence(unsigned int index) {
-            xsPresence ^= (1 << index);
-            xsHaveChanged = true;
-        }
-
-
     private:
         void init() {
             const unsigned int AMOUNT_OF_ROWS = NUMBERS_IN_VECTOR - 1;
@@ -441,7 +431,6 @@ struct Location {
                 case LocationType::X:
                     assert(std::holds_alternative<Coord1>(coord));
                     snapshot.xs[std::get<Coord1>(coord).x] = number;
-                    snapshot.flipXsPresence(std::get<Coord1>(coord).x);
                     break;
                 case LocationType::Buffer:
                     assert(std::holds_alternative<Coord1>(coord));
@@ -744,30 +733,6 @@ public:
                 Step& step = *stepOpt;
                 const std::optional<Number> numberOpt = step.getUntriedNumber();
 
-                // Prevent duplicates as early as possible
-                /* if (numberOpt) { */
-                /*     bool allSet = true; */
-                /*     for (unsigned int i = 0; i < NUMBERS_IN_VECTOR - 1; i++) { */
-                /*         if (snapshot.xs[i].empty()) { */
-                /*             allSet = false; */
-                /*             break; */
-                /*         } */
-                /*     } */
-                /*  */
-                /*     if (allSet) { */
-                /*         Vector x = snapshot.xs; */
-                /*         x[NUMBERS_IN_VECTOR - 1] = *numberOpt; */
-                /*  */
-                /*         if (!unique(x, xs)) { */
-                /*             static auto counter = 0; */
-                /*             if (counter++ > 100) { */
-                /*                 return false; */
-                /*             } */
-                /*             return true; // start anew */
-                /*         } */
-                /*     } */
-                /* } */
-
                 {
                     LOG(std::cout << ">> Inside " << (*stepOpt) << std::endl;)
                     LOG(if (numberOpt) { std::cout << "With Number " << (*numberOpt) << std::endl; } else { std::cout << "With Number " << "*" << std::endl; })
@@ -818,12 +783,6 @@ public:
             return false;
         }
         if (!unique(snapshot.xs, xs)) {
-            /* static auto counter = 0; */
-            /* if (counter++ > 100) { */
-            /*     return false; */
-            /* } else { */
-            /*     return true; */
-            /* } */
             LOG(std::cout << "  Not unique!!" << std::endl;)
             return false;
         }
@@ -934,19 +893,6 @@ public:
         LOG(std::cout << ">>> Inside PokeX " << std::endl;)
         assert(std::holds_alternative<Coord1>(location.coord));
         const unsigned int index = std::get<Coord1>(location.coord).x;
-
-        /* if (snapshot.xsHaveChanged && snapshot.xsPresence == snapshot.allXsPresent) { */
-        /*     #<{(| std::cout << "here" << std::endl; |)}># */
-        /*     if (!unique(snapshot.xs, *currentXsPtr)) { */
-        /*         static auto counter = 0; */
-        /*         if (counter++ > 10) { */
-        /*             tooManyClones = true; */
-        /*         } */
-        /*         return false; // start anew */
-        /*     } */
-        /*     snapshot.xsHaveChanged = false; */
-        /* } */
-
 
         // Main In
         assert(snapshot.blocks[0][index].emptyIn() && ":> IN not empty when X got poked.");
