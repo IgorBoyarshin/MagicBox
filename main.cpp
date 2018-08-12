@@ -682,9 +682,6 @@ private:
         return (index < NUMBERS_IN_VECTOR - 1);
     }
 
-    std::vector<Vector>* currentXsPtr;
-    bool tooManyClones = false;
-
 public:
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
@@ -695,7 +692,6 @@ public:
     }
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {
-        currentXsPtr = &xs;
         static auto counter = 0;
         LOG(std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;)
         Snapshot snapshot(funcs, y);
@@ -723,7 +719,6 @@ public:
             }
         });
 
-        tooManyClones = false;
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
             LOG(std::cout << ">> Got next strategy: " << location << "." << std::endl;)
@@ -743,9 +738,6 @@ public:
                     (numberOpt) ? (stepOpt->useNumber(*numberOpt),
                                     poke(snapshot, step.getLocation(), *numberOpt))
                                 : (std::nullopt);
-                if (tooManyClones) {
-                    return false;
-                }
                 if (numberOpt && actionsOpt) {
                     {
                         LOG(std::cout << ">> Success " << std::endl;)
