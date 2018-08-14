@@ -750,18 +750,13 @@ public:
                     stepOpt = std::nullopt;
                 } else {
                     LOG(std::cout << ">> Fail " << std::endl;)
-                    while (stepOpt && !stepOpt->belowLimit()) {
+                    while (!stepOpt->belowLimit()) {
                         stepOpt = stepsStack.pop(); // returns std::nullopt if stack became empty
-                        if (stepOpt) {
-                            stepOpt->fail(snapshot); // child failed => parent failed. Empty parent's Actions
+                        if (!stepOpt) { // stack depleted
+                            return false; // failed to construct Vector<X>
                         }
+                        stepOpt->fail(snapshot); // child failed => parent failed. Empty parent's Actions
                         strategy.revert();
-                    }
-
-                    // By this line we've either reverted to a valid Step on Stack
-                    // or made stepOpt == std::nullopt if the stack depleted
-                    if (!stepOpt) {
-                        return false; // failed to construct Vector<X>
                     }
                 }
             } while (stepOpt);
