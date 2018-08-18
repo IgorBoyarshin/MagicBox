@@ -11,14 +11,18 @@
 #include <cassert>
 #include <stdlib.h>
 #include <cstring>
+#include <cmath>
+#include <iomanip>
 
 
 // ----------------------------------------------------------------------------
 static const bool DO_LOG = false;
 #define LOG(x) if(DO_LOG) {x}
+
+static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 3;
-static const unsigned int NUMBER_BITS = 3;
+static const unsigned int NUMBERS_IN_VECTOR = 4;
+static const unsigned int NUMBER_BITS = 8;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -102,6 +106,37 @@ std::ostream& operator<<(std::ostream& stream, const Vector& vector) {
 
     return stream;
 }
+
+inline float interpolate(float a, float b, float f) {
+    return a + f * (b - a);
+}
+inline float avg(long long* arr, unsigned int length) {
+    long long sum = 0LL;
+    long long max = 0LL;
+    unsigned int size = 0;
+    for (unsigned int i = 0; i < length; i++) {
+        if (arr[i] > max) max = arr[i];
+        if (arr[i] != 0LL) size++;
+        sum += arr[i];
+    }
+    if (size == length) {
+        sum -= max;
+        size--;
+    }
+
+    return (1.0f * sum) / size;
+}
+// inline float dispersionNormalized(long long* arr, unsigned int length) {
+//     const float m = avg(arr, length);
+//     float sum = 0.0f;
+//     unsigned int size = 0;
+//     for (unsigned int i = 0; i < length; i++) {
+//         #<{(| if (arr[i] == 0) continue; |)}>#
+//         sum += (1.0f - arr[i] / m) * (1.0f - arr[i] / m);
+//         size++;
+//     }
+//     return sum / length;
+// }
 // ----------------------------------------------------------------------------
 // [low, high]
 // template<typename T = unsigned int>
@@ -310,7 +345,7 @@ class Snapshot {
         bool xsHaveChanged = false;
 
         inline void flipXsPresence(unsigned int index) {
-            xsPresence ^= (1 << index);
+            xsPresence ^= (1LL << index);
             xsHaveChanged = true;
         }
 
@@ -568,19 +603,16 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& action
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 4; // <= NUMBERS_AMOUNT
+        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 1; // <= NUMBERS_AMOUNT
 
         Location baseLocation;
-    public:
-        unsigned int depth;
-    private:
         std::vector<Action> actions;
         bool triedNumbers[NUMBERS_AMOUNT];
         unsigned int triedNumbersAmount;
 
     public:
-        Step(const Location& location, unsigned int depth)
-            : baseLocation(location), depth(depth), triedNumbersAmount(0) {
+        Step(const Location& location)
+            : baseLocation(location), triedNumbersAmount(0) {
             memset(triedNumbers, false, NUMBERS_AMOUNT * sizeof(bool));
         }
 
@@ -604,13 +636,38 @@ struct Step {
             return baseLocation;
         }
 
-        bool belowLimit() const {
-            /* const unsigned int retries =  */
-            return (triedNumbersAmount < ALLOWED_RETRIES);
+        /* float f1(float f) const { */
+        /*     return f; */
+        /* } */
+        /* float f2(float f) const { */
+        /*     return std::sqrt(f); */
+        /* } */
+        /* float f3(float f) const { */
+        /*     return 1.0f - std::sqrt(1.0f - f); */
+        /* } */
+        /* float f4(float f) const { */
+        /*     return 1.0f - std::sqrt(std::sqrt(1.0f - f)); */
+        /* } */
+        /* float f5(float f) const { */
+        /*     return 1.0f - std::sqrt(f); */
+        /* } */
+        /* float f6(float f) const { */
+        /*     return std::sqrt(1.0f - f); */
+        /* } */
+
+        bool belowLimit(float Ff, float Fs) const {
+            // {2,1,3}
+            const float min = interpolate(NUMBERS_AMOUNT / NUMBER_BITS, NUMBER_BITS, std::sqrt(Ff));
+            const float max = interpolate(NUMBERS_AMOUNT / 2, NUMBERS_AMOUNT / NUMBER_BITS, Ff);
+            const unsigned int retries = interpolate(min, max, 1.0f - std::sqrt(std::sqrt(1.0f - Fs)));
+            return (triedNumbersAmount < retries);
+
+            /* std::cout << "\tFF: " << Ff << " , " << Fs << " . " << retries << std::endl; */
+            /* return (triedNumbersAmount < ALLOWED_RETRIES); */
         }
 
-        std::optional<Number> getUntriedNumber() const {
-            if (!belowLimit()) return std::nullopt;
+        std::optional<Number> getUntriedNumber(float Ff, float Fs) const {
+            if (!belowLimit(Ff, Fs)) return std::nullopt;
 
             std::vector<Number> untriedNumbers;
             for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
@@ -637,8 +694,14 @@ class Stack {
             steps.push(step);
         }
 
-        void emplace(const Location& location, unsigned int depth) {
-            steps.emplace(location, depth);
+        void emplace(const Location& location) {
+            steps.emplace(location);
+        }
+
+        void undoAll(Snapshot& snapshot) {
+            while (auto stepOpt = pop()) {
+                stepOpt->fail(snapshot);
+            }
         }
 
         std::optional<Step> pop() {
@@ -687,34 +750,82 @@ class Strategy {
 
             return false;
         }
-
-        unsigned int getDepth() const {
-            return nextIndex - 1;
-        }
 };
 // ----------------------------------------------------------------------------
 class MagicBox {
 public:
     Functions funcs;
 
+    MagicBox() {
+        for (unsigned int i = 0; i < lastTriesCount; i++) {
+            lastTries[i] = 0;
+        }
+    }
+
 private:
     bool hasSecondaryIn(unsigned int index) const {
         return (index < NUMBERS_IN_VECTOR - 1);
     }
 
-    std::vector<Vector>* currentXsPtr;
+    std::vector<Vector>* currentXsPtr = nullptr;
     bool tooManyClones = false;
+
+    const unsigned int allowedSubsequentDropsCount = 4;
+    unsigned int subsequentDrops = 0;
+    static const unsigned int lastTriesCount = NUMBER_BITS;
+    unsigned int lastTryIndex = 0;
+    long long lastTries[lastTriesCount];
+
+    float getAverageTries() {
+        return avg(lastTries, lastTriesCount);
+    }
+
+    float calculateFf(const Functions& funcs) const {
+        unsigned int fill = 0;
+        for (const Func& func : funcs) {
+            for (unsigned int i = 0; i < Func::SIZE; i++) {
+                if (!func.emptyAt(i)) fill++;
+            }
+        }
+
+        return 1.0f * fill / (FUNCS_AMOUNT * Func::SIZE);
+    }
+
+    float calculateFs(const Snapshot& snapshot) const {
+        unsigned int fill = 0;
+        unsigned int size = 0;
+        for (const Number& n : snapshot.xs) {
+            if (!n.empty()) fill++;
+            size++;
+        }
+        for (const Number& n : snapshot.buffers) {
+            if (!n.empty()) fill++;
+            size++;
+        }
+        for (const auto& row : snapshot.blocks) {
+            for (const Block& b : row) {
+                if (!b.emptyIn()) fill++;
+                if (!b.emptyOut()) fill++;
+                size++;
+                size++;
+            }
+        }
+
+        return 1.0f * fill / size;
+    }
 
 public:
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
-        outputResult(xs, y);
+        std::cout << "----------------------------------------------------" << std::endl;
+        while (generateNewX(xs, y));
+        // outputResult(xs, y);
 
         return xs;
     }
 
-    bool generateNewX(std::vector<Vector>& xs, const Vector& y) {
+    bool generateNewX(std::vector<Vector>& xs, const Vector& y) {;
         currentXsPtr = &xs; // HERE
         static auto counter = 0;
         LOG(std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;)
@@ -743,15 +854,47 @@ public:
             }
         });
 
+                static const auto func = [](float f) -> float {
+                    /* return 100.0f * (1.0f - f); */
+                    return 10.0f;
+
+                    /* if (f <= 0.5f) { */
+                    /*     return 185.0f; */
+                    /* } else if (f <= 0.9f) { */
+                    /*     return (-900.0f * f + 820) / 2.0f; */
+                    /* } else { */
+                    /*     return 50.0f * (1.0f - f); */
+                    /* } */
+                };
+
+        /*
+         * 596: 15, 9:30
+         * 630: 9
+         * 616: 8
+         * 604: 5
+         * 580: .36
+         */
+                const float Ff = calculateFf(funcs);
         tooManyClones = false; // HERE
+        long long triesCounter = 0LL;
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
             LOG(std::cout << ">> Got next strategy: " << location << "." << std::endl;)
 
-            std::optional<Step> stepOpt = {Step(location, strategy.getDepth())};
+            std::optional<Step> stepOpt = {Step(location)};
             do {
+                const float Fs = calculateFs(snapshot);
+                if (triesCounter++ > func(Ff) * getAverageTries()) {
+                    std::cout << "dropped with " << triesCounter << std::endl;
+                    if (++subsequentDrops > allowedSubsequentDropsCount) {
+                        return false;
+                    }
+                    stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise
+                    return true;
+                }
+
                 Step& step = *stepOpt;
-                const std::optional<Number> numberOpt = step.getUntriedNumber();
+                const std::optional<Number> numberOpt = step.getUntriedNumber(Ff, Fs);
 
                 {
                     LOG(std::cout << ">> Inside " << (*stepOpt) << std::endl;)
@@ -778,7 +921,7 @@ public:
                     stepOpt = std::nullopt;
                 } else {
                     LOG(std::cout << ">> Fail " << std::endl;)
-                    while (!stepOpt->belowLimit()) {
+                    while (!stepOpt->belowLimit(calculateFf(funcs), calculateFs(snapshot))) {
                         stepOpt = stepsStack.pop(); // returns std::nullopt if stack became empty
                         if (!stepOpt) { // stack depleted
                             return false; // failed to construct Vector<X>
@@ -793,10 +936,7 @@ public:
         }
 
         // Everything is swell, extract the Xs from snapshot
-        if (!full(snapshot)) {
-            std::cout << "  Snapshot not full?!" << std::endl;
-            return false;
-        }
+        assert(full(snapshot) && "  Snapshot not full?!");
         if (!unique(snapshot.xs, xs)) {
             /* static auto counter = 0; */
             /* std::cout << "Cou: " << counter << std::endl; */
@@ -811,8 +951,18 @@ public:
         xs.push_back(snapshot.xs);
 
         LOG(std::cout << snapshot.funcs;)
-            static auto co = 0;
-        std::cout << "New x " << co++ << std::endl;
+
+        subsequentDrops = 0;
+        lastTries[lastTryIndex++] = triesCounter;
+        if (lastTryIndex >= lastTriesCount) lastTryIndex = 0;
+
+        static auto co = 0;
+        std::cout << "New x(" << ++co << ")"
+            << " Ff={" << calculateFf(snapshot.funcs) << "}"
+            << " Steps=[" << triesCounter << "]"
+            << " N: " << std::fixed << getAverageTries() << " : " <<  func(Ff)
+            << " Next: " << std::fixed << getAverageTries() * func(Ff)
+            << std::endl;
 
         return true;
     }
@@ -1195,8 +1345,9 @@ public:
 
     void outputResult(const std::vector<Vector>& xs, const Vector& y) {
         std::cout << ":> For Y " << y << " the following Xs were generated (" << xs.size() << "):" << std::endl;
+        unsigned int counter = 0;
         for (const Vector& x : xs) {
-            std::cout << x << std::endl;
+            std::cout << "[" << ++counter << "]: " << x << std::endl;
         }
     }
 
@@ -1241,7 +1392,8 @@ void fillRemainingRandom(Functions& funcs) {
 // ----------------------------------------------------------------------------
 int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
-    srand (309);
+    srand (411);
+
 
     MagicBox mb;
     const Vector y = generateRandomVector();
@@ -1249,35 +1401,37 @@ int main() {
     fillRemainingRandom(mb.funcs);
 
 
-    std::cout << std::endl << "Checking all possible Xs..." << std::endl;
-    unsigned int counter = 0;
-    std::array<unsigned int, NUMBERS_IN_VECTOR> nextToUse;
-    for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) nextToUse[i] = 0;
-    while (true) {
-        // Construct X
-        Vector x{};
-        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
-            x[i] = nextToUse[i];
-        }
+    if (DO_CHECK) {
+        std::cout << std::endl << "Checking all possible Xs..." << std::endl;
+        unsigned int counter = 0;
+        std::array<unsigned int, NUMBERS_IN_VECTOR> nextToUse;
+        for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) nextToUse[i] = 0;
+        while (true) {
+            // Construct X
+            Vector x{};
+            for (unsigned int i = 0; i < NUMBERS_IN_VECTOR; i++) {
+                x[i] = nextToUse[i];
+            }
 
-        // Check
-        if (mb.apply(x) == y) {
-            std::cout << "[" << ++counter<< "]: " << x << " -> " << y << std::endl;
-        }
+            // Check
+            if (mb.apply(x) == y) {
+                std::cout << "[" << ++counter<< "]: " << x << " -> " << y << std::endl;
+            }
 
-        // Prepare for next iteration
-        nextToUse[NUMBERS_IN_VECTOR - 1]++;
-        for (unsigned int i = NUMBERS_IN_VECTOR - 1; i > 0; i--) {
-            if (nextToUse[i] == NUMBERS_AMOUNT) {
-                nextToUse[i-1]++;
-                nextToUse[i] = 0;
+            // Prepare for next iteration
+            nextToUse[NUMBERS_IN_VECTOR - 1]++;
+            for (unsigned int i = NUMBERS_IN_VECTOR - 1; i > 0; i--) {
+                if (nextToUse[i] == NUMBERS_AMOUNT) {
+                    nextToUse[i-1]++;
+                    nextToUse[i] = 0;
+                }
+            }
+            if (nextToUse[0] == NUMBERS_AMOUNT) {
+                break;
             }
         }
-        if (nextToUse[0] == NUMBERS_AMOUNT) {
-            break;
-        }
+        std::cout << "The model has (" << counter << ") Xs total" << std::endl;
     }
-    std::cout << "The model has (" << counter << ") Xs total" << std::endl;
 
 
     std::cout << std::endl << "---------------------END-----------------------" << std::endl;
