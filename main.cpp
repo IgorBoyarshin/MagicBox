@@ -21,8 +21,8 @@ static const bool DO_LOG = false;
 
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 4;
-static const unsigned int NUMBER_BITS = 8;
+static const unsigned int NUMBERS_IN_VECTOR = 8;
+static const unsigned int NUMBER_BITS = 18;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -172,11 +172,17 @@ struct Func {
 
     private:
         // num_in -> num_out
-        Number map[SIZE];
+        // Number map[SIZE];
+        Number* map;
 
     public:
         Func() {
+            map = new Number[SIZE];
             for (unsigned int i = 0; i < SIZE; i++) map[i] = Number(EMPTY_NUMBER);
+        }
+
+        virtual ~Func() {
+            delete[] map;
         }
 
         bool setAt(const Number& arg) const {
