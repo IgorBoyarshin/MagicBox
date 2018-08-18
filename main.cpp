@@ -22,7 +22,7 @@ static const bool DO_LOG = false;
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
 static const unsigned int NUMBERS_IN_VECTOR = 8;
-static const unsigned int NUMBER_BITS = 18;
+static const unsigned int NUMBER_BITS = 14;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -142,7 +142,8 @@ inline float avg(long long* arr, unsigned int length) {
 // template<typename T = unsigned int>
 // T generateRandomUniformInt(T low, T high) {
 //     static std::random_device rd;
-//     static std::mt19937 e2(rd());
+//     static std::seed_seq seed{1, 2, 3, 300};
+//     static std::mt19937 e2(seed);
 //     static std::uniform_int_distribution<T> dist(low, high);
 //
 //     return dist(e2);
@@ -154,7 +155,7 @@ unsigned int generateRandomUniformInt(unsigned int low, unsigned int high) {
 }
 
 Number generateRandomNumber() {
-    return generateRandomUniformInt((unsigned int)0, NUMBER_MAX);
+    return generateRandomUniformInt(0U, NUMBER_MAX);
 }
 
 Vector generateRandomVector() {
@@ -437,7 +438,7 @@ std::optional<Coord2> findEmptyBlock(const Snapshot& snapshot) {
 std::ostream& operator<<(std::ostream& stream, const Snapshot& snapshot) {
     stream << "+++++++Snap+++++" << std::endl;
     for (const auto& x : snapshot.xs) {
-        stream << x.value << " ";
+        stream << x << " ";
     }
     stream << std::endl;
     stream << std::endl;
@@ -453,11 +454,11 @@ std::ostream& operator<<(std::ostream& stream, const Snapshot& snapshot) {
         stream << std::endl;
     }
     for (const auto& b : snapshot.buffers) {
-        stream << b.value << " ";
+        stream << b << " ";
     }
     stream << std::endl;
     for (const auto& y : snapshot.ys) {
-        stream << y.value << " ";
+        stream << y << " ";
     }
     stream << std::endl;
     stream << "++++++++++++++++" << std::endl;
@@ -609,7 +610,7 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& action
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 1; // <= NUMBERS_AMOUNT
+        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 4; // <= NUMBERS_AMOUNT
 
         Location baseLocation;
         std::vector<Action> actions;
@@ -662,7 +663,6 @@ struct Step {
         /* } */
 
         bool belowLimit(float Ff, float Fs) const {
-            // {2,1,3}
             const float min = interpolate(NUMBERS_AMOUNT / NUMBER_BITS, NUMBER_BITS, std::sqrt(Ff));
             const float max = interpolate(NUMBERS_AMOUNT / 2, NUMBERS_AMOUNT / NUMBER_BITS, Ff);
             const unsigned int retries = interpolate(min, max, 1.0f - std::sqrt(std::sqrt(1.0f - Fs)));
@@ -679,7 +679,7 @@ struct Step {
             for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
                 if (!triedNumbers[i]) untriedNumbers.emplace_back(i);
             }
-            return { untriedNumbers[generateRandomUniformInt(0, untriedNumbers.size() - 1)] };
+            return { untriedNumbers[generateRandomUniformInt(0U, static_cast<unsigned int>(untriedNumbers.size() - 1))] };
         }
 
         friend std::ostream& operator<<(std::ostream& stream, const Step& step);
@@ -773,8 +773,8 @@ private:
         return (index < NUMBERS_IN_VECTOR - 1);
     }
 
-    std::vector<Vector>* currentXsPtr = nullptr;
-    bool tooManyClones = false;
+    // std::vector<Vector>* currentXsPtr = nullptr;
+    // bool tooManyClones = false;
 
     const unsigned int allowedSubsequentDropsCount = 4;
     unsigned int subsequentDrops = 0;
@@ -824,15 +824,15 @@ public:
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
-        std::cout << "----------------------------------------------------" << std::endl;
-        while (generateNewX(xs, y));
+        /* std::cout << "----------------------------------------------------" << std::endl; */
+        /* while (generateNewX(xs, y)); */
         // outputResult(xs, y);
 
         return xs;
     }
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {;
-        currentXsPtr = &xs; // HERE
+        /* currentXsPtr = &xs; // HERE */
         static auto counter = 0;
         LOG(std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;)
         Snapshot snapshot(funcs, y);
@@ -843,6 +843,7 @@ public:
                     const Functions& funcs)
                 -> std::optional<Location> {
             if (index < NUMBERS_IN_VECTOR) { // first three insertions
+            /* if (false) { // first three insertions */
                 return { {LocationType::X, {index}} };
             } else {
                 if (const std::optional<Coord2> emptyBlock = findEmptyBlock(snapshot)) {
@@ -861,8 +862,8 @@ public:
         });
 
                 static const auto func = [](float f) -> float {
-                    /* return 100.0f * (1.0f - f); */
-                    return 10.0f;
+                    return 100.0f * (1.0f - f);
+                    /* return 1000.0f; */
 
                     /* if (f <= 0.5f) { */
                     /*     return 185.0f; */
@@ -881,7 +882,7 @@ public:
          * 580: .36
          */
                 const float Ff = calculateFf(funcs);
-        tooManyClones = false; // HERE
+        // tooManyClones = false; // HERE
         long long triesCounter = 0LL;
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
@@ -912,9 +913,9 @@ public:
                     (numberOpt) ? (stepOpt->useNumber(*numberOpt),
                                     poke(snapshot, step.getLocation(), *numberOpt))
                                 : (std::nullopt);
-                if (tooManyClones) {
-                    return false; // HERE
-                }
+                /* if (tooManyClones) { */
+                /*     return false; // HERE */
+                // }
                 if (numberOpt && actionsOpt) {
                     {
                         LOG(std::cout << ">> Success " << std::endl;)
@@ -944,15 +945,16 @@ public:
         // Everything is swell, extract the Xs from snapshot
         assert(full(snapshot) && "  Snapshot not full?!");
         if (!unique(snapshot.xs, xs)) {
-            /* static auto counter = 0; */
-            /* std::cout << "Cou: " << counter << std::endl; */
-            /* if (counter++ > 20) { */
-            /*     return false; */
-            /* } else { */
-            /*     return true; */
-            /* } */
-            LOG(std::cout << "  Not unique!!" << std::endl;)
-            return false;
+            static auto counter = 0;
+            std::cout << "Cou: " << counter << std::endl;
+            if (counter++ > 20) {
+                return false;
+            } else {
+                stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise
+                return true;
+            }
+            /* LOG(std::cout << "  Not unique!!" << std::endl;) */
+            /* return false; */
         }
         xs.push_back(snapshot.xs);
 
@@ -1016,14 +1018,14 @@ public:
             const LocationType& locationType,
             const std::variant<Coord1, Coord2, Coord3>& coord,
             const Number& value) {
-        LOG(std::cout << "Inside pokeAndInsert" << std::endl;)
+        LOG(std::cout << "Inside pokeAndInsert " << locationType << std::endl;)
         if (const auto& actionsOpt = poke(snapshot, Location(locationType, coord), value)) {
-            LOG(std::cout << "Succ done pokeAndInsert" << std::endl;)
+            LOG(std::cout << "Succ done pokeAndInsert " << locationType << std::endl;)
             actions.insert(actions.end(), actionsOpt->begin(), actionsOpt->end());
             return true;
         }
 
-        LOG(std::cout << "Failed pokeAndInsert" << std::endl;)
+        LOG(std::cout << "Failed pokeAndInsert " << locationType << std::endl;)
         return false;
     }
 
@@ -1035,7 +1037,7 @@ public:
         actions[0].apply(snapshot);
         {
             LOG(std::cout << ">>> Inside Poke " << std::endl;)
-            LOG(std::cout << actions << std::endl;)
+            LOG(std::cout << "Just done: " << actions << std::endl;)
             LOG(std::cout << snapshot << std::endl;)
             LOG(std::cout << snapshot.funcs;)
         }
@@ -1075,28 +1077,28 @@ public:
     }
 
 
-    bool canContinue(Snapshot& snapshot) {
-        if (snapshot.xsHaveChanged && snapshot.xsPresence == snapshot.allXsPresent) {
-            if (!unique(snapshot.xs, *currentXsPtr)) {
-                static auto counter = 0;
-                std::cout << "Cou: " << counter << std::endl;
-                if (counter++ > 20) {
-                    tooManyClones = true;
-                }
-                return false; // start anew
-            }
-            snapshot.xsHaveChanged = false;
-        }
-
-        return true;
-    }
+    // bool canContinue(Snapshot& snapshot) {
+    //     if (snapshot.xsHaveChanged && snapshot.xsPresence == snapshot.allXsPresent) {
+    //         if (!unique(snapshot.xs, *currentXsPtr)) {
+    //             static auto counter = 0;
+    //             std::cout << "Cou: " << counter << std::endl;
+    //             if (counter++ > 20) {
+    //                 tooManyClones = true;
+    //             }
+    //             return false; // start anew
+    //         }
+    //         snapshot.xsHaveChanged = false;
+    //     }
+    //
+    //     return true;
+    // }
 
 
     bool pokeX(Snapshot& snapshot, std::vector<Action>& actions, const Coord1& coord, const Number& number) {
         LOG(std::cout << ">>> Inside PokeX " << std::endl;)
         const unsigned int index = coord.x;
 
-        if (!canContinue(snapshot)) return false;
+        /* if (!canContinue(snapshot)) return false; */
 
         // Main In
         if (const Block& block = snapshot.blocks[0][index];
@@ -1135,7 +1137,7 @@ public:
     bool pokeBuffer(Snapshot& snapshot, std::vector<Action>& actions, const Coord1& coord, const Number& number) {
         LOG(std::cout << ">>> Inside PokeBuffer " << std::endl;)
         const unsigned int index = coord.x;
-        const Number expectedValueX = XOR(number, snapshot.ys[index].value);
+        const Number expectedValueX = XOR(number, snapshot.ys[index]);
 
         // X
         if (const Number& numberX = snapshot.xs[index];
@@ -1143,27 +1145,27 @@ public:
             // just set X, but never poke it
             actions.emplace_back(Location(LocationType::X, Coord1(index)), expectedValueX);
             (actions.end() - 1)->apply(snapshot);
-            if (!canContinue(snapshot)) return false;
-        } else if (expectedValueX != numberX.value) return false;
+            /* if (!canContinue(snapshot)) return false; */
+        } else if (expectedValueX != numberX) return false;
 
         // Main In
-        if (const Block& block = snapshot.blocks[0][index];
-                block.emptyIn()) {
+        if (const Number& in = snapshot.blocks[0][index].In();
+                in.empty()) {
             if (!pokeAndInsert(snapshot, actions,
                         LocationType::Block,
                         Coord3(0, index, BlockCell::IN),
                         expectedValueX)) return false;
-        } else if (block.In() != expectedValueX) return false;
+        } else if (in != expectedValueX) return false;
 
         // Secondary In
         if (hasSecondaryIn(index)) {
-            if (const Block& block = snapshot.blocks[0][index + NUMBERS_IN_VECTOR];
-                    block.emptyIn()) {
+            if (const Number& in = snapshot.blocks[0][index + NUMBERS_IN_VECTOR].In();
+                    in.empty()) {
                 if (!pokeAndInsert(snapshot, actions,
                             LocationType::Block,
                             Coord3(0, index + NUMBERS_IN_VECTOR, BlockCell::IN),
                             expectedValueX)) return false;
-            } else if (block.In() != expectedValueX) return false;
+            } else if (in != expectedValueX) return false;
         }
 
         // Outs
@@ -1213,29 +1215,37 @@ public:
             const bool mainIn = columnIndex < NUMBERS_IN_VECTOR;
             const unsigned int xIndex = (mainIn) ? columnIndex
                                                  : (columnIndex - NUMBERS_IN_VECTOR);
+            // X
             if (snapshot.xs[xIndex].empty()) {
                 // Set X (just set, never poke)
                 actions.emplace_back(Location(LocationType::X, Coord1(xIndex)), number);
                 (actions.end() - 1)->apply(snapshot);
-                if (!canContinue(snapshot)) return false;
+                /* if (!canContinue(snapshot)) return false; */
+            } else if (snapshot.xs[xIndex] != number) return false;
 
-                // Secondary In
-                if (hasSecondaryIn(xIndex)) {
-                    const unsigned int otherColumnIndex =
-                        (mainIn) ? (columnIndex + NUMBERS_IN_VECTOR)
-                                 : (columnIndex - NUMBERS_IN_VECTOR);
+            // Secondary In
+            if (hasSecondaryIn(xIndex)) {
+                const unsigned int otherColumnIndex =
+                    (mainIn) ? (columnIndex + NUMBERS_IN_VECTOR)
+                             : (columnIndex - NUMBERS_IN_VECTOR);
+                if (const Number& in = snapshot.blocks[0][otherColumnIndex].In();
+                        in.empty()) {
                     if (!pokeAndInsert(snapshot, actions,
-                                LocationType::X,
-                                Coord1(otherColumnIndex),
+                                LocationType::Block,
+                                Coord3(0, otherColumnIndex, BlockCell::IN),
                                 number)) return false;
-                }
+                } else if (in != number) return false;
+            }
 
-                // Set Buffer
+            // Buffer
+            const Number expectedValueBuffer = XOR(number, snapshot.ys[xIndex]);
+            if (const Number& buffer = snapshot.buffers[xIndex];
+                    buffer.empty()){
                 if (!pokeAndInsert(snapshot, actions,
                             LocationType::Buffer,
-                            Coord1(columnIndex),
-                            number)) return false;
-            } else if (snapshot.xs[xIndex] != number) return false;
+                            Coord1(xIndex),
+                            expectedValueBuffer)) return false;
+            } else if (buffer != expectedValueBuffer) return false;
         } else { // rowIndex >= 1
             // foreign Outs above self
             const Block& block1Const = snapshot.blocks[rowIndex - 1][columnIndex];
@@ -1267,9 +1277,9 @@ public:
         const unsigned int columnIndex = coord.y;
 
         // Self In
-        if (const auto& block = snapshot.blocks[rowIndex][columnIndex];
-                !block.emptyIn()) {
-            if (const auto& funcRes = snapshot.funcs[columnIndex].at(block.In());
+        if (const Number& in = snapshot.blocks[rowIndex][columnIndex].In();
+                !in.empty()) {
+            if (const auto& funcRes = snapshot.funcs[columnIndex].at(in);
                     !funcRes.empty()) {
                 if (funcRes != number) return false;
             } else if (!setFuncAndPokeColumnAndInsert(snapshot, actions, coord)) return false;
@@ -1299,8 +1309,8 @@ public:
         };
 
         // Connections through XOR
+        const unsigned int rowSize = snapshot.blocks[rowIndex].size();
         const unsigned int lastRowIndex = snapshot.blocks.size() - 1;
-        const unsigned int rowSize = snapshot.blocks[lastRowIndex].size();
         const bool bottom = rowIndex == lastRowIndex;
         if (columnIndex < rowSize - 1) { // left tail
             if (!processPairAndInsert(
@@ -1390,7 +1400,7 @@ void fillRemainingRandom(Functions& funcs) {
     for (Func& func : funcs) {
         for (unsigned int i = 0; i < Func::SIZE; i++) {
             if (func.emptyAt(i)) {
-                func.update(i, generateRandomUniformInt(0, NUMBER_MAX));
+                func.update(i, generateRandomUniformInt(0U, NUMBER_MAX));
             }
         }
     }
@@ -1398,7 +1408,7 @@ void fillRemainingRandom(Functions& funcs) {
 // ----------------------------------------------------------------------------
 int main() {
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
-    srand (411);
+    srand(410);
 
 
     MagicBox mb;
