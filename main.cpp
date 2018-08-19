@@ -126,17 +126,6 @@ inline float avg(long long* arr, unsigned int length) {
 
     return (1.0f * sum) / size;
 }
-// inline float dispersionNormalized(long long* arr, unsigned int length) {
-//     const float m = avg(arr, length);
-//     float sum = 0.0f;
-//     unsigned int size = 0;
-//     for (unsigned int i = 0; i < length; i++) {
-//         #<{(| if (arr[i] == 0) continue; |)}>#
-//         sum += (1.0f - arr[i] / m) * (1.0f - arr[i] / m);
-//         size++;
-//     }
-//     return sum / length;
-// }
 // ----------------------------------------------------------------------------
 // [low, high]
 // template<typename T = unsigned int>
@@ -173,7 +162,6 @@ struct Func {
 
     private:
         // num_in -> num_out
-        // Number map[SIZE];
         Number* map;
 
     public:
@@ -346,16 +334,6 @@ class Snapshot {
         std::array<Number, NUMBERS_IN_VECTOR> xs;
         const std::array<Number, NUMBERS_IN_VECTOR> ys;
 
-        // HERE
-        long long xsPresence = 0;
-        const long long allXsPresent = (1 << NUMBERS_IN_VECTOR) - 1;
-        bool xsHaveChanged = false;
-
-        inline void flipXsPresence(unsigned int index) {
-            xsPresence ^= (1LL << index);
-            xsHaveChanged = true;
-        }
-
     private:
         void init() {
             const unsigned int AMOUNT_OF_ROWS = NUMBERS_IN_VECTOR - 1;
@@ -483,7 +461,6 @@ struct Location {
                 case LocationType::X:
                     assert(std::holds_alternative<Coord1>(coord));
                     snapshot.xs[std::get<Coord1>(coord).x] = number;
-                    snapshot.flipXsPresence(std::get<Coord1>(coord).x); // HERE
                     break;
                 case LocationType::Buffer:
                     assert(std::holds_alternative<Coord1>(coord));
@@ -776,9 +753,6 @@ private:
         return (index < NUMBERS_IN_VECTOR - 1);
     }
 
-    // std::vector<Vector>* currentXsPtr = nullptr;
-    // bool tooManyClones = false;
-
     const unsigned int allowedSubsequentDropsCount = 4;
     unsigned int subsequentDrops = 0;
     static const unsigned int lastTriesCount = NUMBER_BITS;
@@ -827,15 +801,12 @@ public:
     std::vector<Vector> work(const Vector& y) {
         std::vector<Vector> xs;
         while (generateNewX(xs, y));
-        /* std::cout << "----------------------------------------------------" << std::endl; */
-        /* while (generateNewX(xs, y)); */
         // outputResult(xs, y);
 
         return xs;
     }
 
     bool generateNewX(std::vector<Vector>& xs, const Vector& y) {;
-        /* currentXsPtr = &xs; // HERE */
         static auto counter = 0;
         LOG(std::cout << ">> Generating new X(" << counter++ << ")" << std::endl;)
         Snapshot snapshot(funcs, y);
@@ -846,7 +817,6 @@ public:
                     const Functions& funcs)
                 -> std::optional<Location> {
             if (index < NUMBERS_IN_VECTOR) { // first three insertions
-            /* if (false) { // first three insertions */
                 return { {LocationType::X, {index}} };
             } else {
                 if (const std::optional<Coord2> emptyBlock = findEmptyBlock(snapshot)) {
@@ -866,26 +836,9 @@ public:
 
                 static const auto func = [](float f) -> float {
                     return 100.0f * (1.0f - f);
-                    /* return 1000.0f; */
-
-                    /* if (f <= 0.5f) { */
-                    /*     return 185.0f; */
-                    /* } else if (f <= 0.9f) { */
-                    /*     return (-900.0f * f + 820) / 2.0f; */
-                    /* } else { */
-                    /*     return 50.0f * (1.0f - f); */
-                    /* } */
                 };
 
-        /*
-         * 596: 15, 9:30
-         * 630: 9
-         * 616: 8
-         * 604: 5
-         * 580: .36
-         */
-                const float Ff = calculateFf(funcs);
-        // tooManyClones = false; // HERE
+        const float Ff = calculateFf(funcs);
         long long triesCounter = 0LL;
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
@@ -916,9 +869,6 @@ public:
                     (numberOpt) ? (stepOpt->useNumber(*numberOpt),
                                     poke(snapshot, step.getLocation(), *numberOpt))
                                 : (std::nullopt);
-                /* if (tooManyClones) { */
-                /*     return false; // HERE */
-                // }
                 if (numberOpt && actionsOpt) {
                     {
                         LOG(std::cout << ">> Success " << std::endl;)
@@ -1080,28 +1030,9 @@ public:
     }
 
 
-    // bool canContinue(Snapshot& snapshot) {
-    //     if (snapshot.xsHaveChanged && snapshot.xsPresence == snapshot.allXsPresent) {
-    //         if (!unique(snapshot.xs, *currentXsPtr)) {
-    //             static auto counter = 0;
-    //             std::cout << "Cou: " << counter << std::endl;
-    //             if (counter++ > 20) {
-    //                 tooManyClones = true;
-    //             }
-    //             return false; // start anew
-    //         }
-    //         snapshot.xsHaveChanged = false;
-    //     }
-    //
-    //     return true;
-    // }
-
-
     bool pokeX(Snapshot& snapshot, std::vector<Action>& actions, const Coord1& coord, const Number& number) {
         LOG(std::cout << ">>> Inside PokeX " << std::endl;)
         const unsigned int index = coord.x;
-
-        /* if (!canContinue(snapshot)) return false; */
 
         // Main In
         if (const Block& block = snapshot.blocks[0][index];
