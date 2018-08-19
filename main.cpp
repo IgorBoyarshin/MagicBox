@@ -21,8 +21,8 @@ static const bool DO_LOG = false;
 
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 14;
-static const unsigned int NUMBER_BITS = 18;
+static const unsigned int NUMBERS_IN_VECTOR = 4;
+static const unsigned int NUMBER_BITS = 6;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -587,7 +587,7 @@ std::ostream& operator<<(std::ostream& stream, const std::vector<Action>& action
 // Conditional, random
 struct Step {
     private:
-        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT / 4 * 4; // <= NUMBERS_AMOUNT
+        static const unsigned int ALLOWED_RETRIES = NUMBERS_AMOUNT; // <= NUMBERS_AMOUNT
 
         Location baseLocation;
         std::vector<Action> actions;
@@ -638,12 +638,12 @@ struct Step {
 
         bool belowLimit(float Ff, float Fs) const {
             const float min = interpolate(NUMBERS_AMOUNT / NUMBER_BITS, NUMBER_BITS, std::sqrt(Ff));
-            const float max = interpolate(NUMBERS_AMOUNT / 2, NUMBERS_AMOUNT / NUMBER_BITS, Ff);
+            const float max = interpolate(NUMBERS_AMOUNT, NUMBERS_AMOUNT / NUMBER_BITS, Ff);
             const unsigned int retries = interpolate(min, max, 1.0f - std::sqrt(std::sqrt(1.0f - Fs)));
             return triedNumbers.size() < retries;
 
             /* std::cout << "\tFF: " << Ff << " , " << Fs << " . " << retries << std::endl; */
-            /* return (triedNumbersAmount < ALLOWED_RETRIES); */
+            /* return (triedNumbers.size() < ALLOWED_RETRIES); */
         }
 
         std::optional<Number> getUntriedNumber(float Ff, float Fs) const {
@@ -652,11 +652,9 @@ struct Step {
             const unsigned int untriedCount = NUMBERS_AMOUNT - triedNumbers.size();
             const unsigned int index = generateRandomUniformInt(0U, untriedCount - 1);
             for (unsigned int i = 0, count = 0; i < NUMBERS_AMOUNT; i++) {
-                if (count == index) {
+                if (triedNumbers.find(i) != triedNumbers.end()) continue;
+                if (count++ == index) {
                     return { Number(i) };
-                }
-                if (triedNumbers.find(i) == triedNumbers.end()) {
-                    count++;
                 }
             }
             return std::nullopt;
@@ -834,9 +832,9 @@ public:
             }
         });
 
-                static const auto func = [](float f) -> float {
-                    return 100.0f * (1.0f - f);
-                };
+        /* static const auto func = [](float f) -> float { */
+        /*     return 100.0f * (1.0f - f); */
+        /* }; */
 
         const float Ff = calculateFf(funcs);
         long long triesCounter = 0LL;
@@ -847,14 +845,15 @@ public:
             std::optional<Step> stepOpt = {Step(location)};
             do {
                 const float Fs = calculateFs(snapshot);
-                if (triesCounter++ > func(Ff) * getAverageTries()) {
-                    std::cout << "dropped with " << triesCounter << std::endl;
-                    if (++subsequentDrops > allowedSubsequentDropsCount) {
-                        return false;
-                    }
-                    stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise
-                    return true;
-                }
+                triesCounter++;
+                /* if (triesCounter++ > func(Ff) * getAverageTries()) { */
+                /*     std::cout << "dropped with " << triesCounter << std::endl; */
+                /*     if (++subsequentDrops > allowedSubsequentDropsCount) { */
+                /*         return false; */
+                /*     } */
+                /*     stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise */
+                /*     return true; */
+                /* } */
 
                 Step& step = *stepOpt;
                 const std::optional<Number> numberOpt = step.getUntriedNumber(Ff, Fs);
@@ -884,6 +883,7 @@ public:
                     while (!stepOpt->belowLimit(calculateFf(funcs), calculateFs(snapshot))) {
                         stepOpt = stepsStack.pop(); // returns std::nullopt if stack became empty
                         if (!stepOpt) { // stack depleted
+                            std::cout << ":> Finished because the stack has depleted." << std::endl;
                             return false; // failed to construct Vector<X>
                         }
                         stepOpt->fail(snapshot); // child failed => parent failed. Empty parent's Actions
@@ -898,16 +898,15 @@ public:
         // Everything is swell, extract the Xs from snapshot
         assert(full(snapshot) && "  Snapshot not full?!");
         if (!unique(snapshot.xs, xs)) {
-            static auto counter = 0;
-            std::cout << "Cou: " << counter << std::endl;
-            if (counter++ > 20) {
+            static auto duplicatesCounter = 0;
+            std::cout << ":> Duplicate generated (" << ++duplicatesCounter << "). Skipping." <<  std::endl;
+            if (duplicatesCounter > 20) {
+                std::cout << ":> Finished because duplicates limit has beed exceeded." << std::endl;
                 return false;
             } else {
                 stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise
                 return true;
             }
-            /* LOG(std::cout << "  Not unique!!" << std::endl;) */
-            /* return false; */
         }
         xs.push_back(snapshot.xs);
 
@@ -921,8 +920,6 @@ public:
         std::cout << "New x(" << ++co << ")"
             << " Ff={" << calculateFf(snapshot.funcs) << "}"
             << " Steps=[" << triesCounter << "]"
-            << " N: " << std::fixed << getAverageTries() << " : " <<  func(Ff)
-            << " Next: " << std::fixed << getAverageTries() * func(Ff)
             << std::endl;
 
         return true;
