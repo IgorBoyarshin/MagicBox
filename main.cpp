@@ -15,14 +15,16 @@
 #include <iomanip>
 
 
+// 16-16: Ff=0.5 [4075] in 2:03
+// 14-18: Ff=0.5 [18500] in 25:30
 // ----------------------------------------------------------------------------
 static const bool DO_LOG = false;
 #define LOG(x) if(DO_LOG) {x}
 
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 4;
-static const unsigned int NUMBER_BITS = 6;
+static const unsigned int NUMBERS_IN_VECTOR = 14;
+static const unsigned int NUMBER_BITS = 18;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -617,32 +619,11 @@ struct Step {
             return baseLocation;
         }
 
-        /* float f1(float f) const { */
-        /*     return f; */
-        /* } */
-        /* float f2(float f) const { */
-        /*     return std::sqrt(f); */
-        /* } */
-        /* float f3(float f) const { */
-        /*     return 1.0f - std::sqrt(1.0f - f); */
-        /* } */
-        /* float f4(float f) const { */
-        /*     return 1.0f - std::sqrt(std::sqrt(1.0f - f)); */
-        /* } */
-        /* float f5(float f) const { */
-        /*     return 1.0f - std::sqrt(f); */
-        /* } */
-        /* float f6(float f) const { */
-        /*     return std::sqrt(1.0f - f); */
-        /* } */
-
         bool belowLimit(float Ff, float Fs) const {
             const float min = interpolate(NUMBERS_AMOUNT / NUMBER_BITS, NUMBER_BITS, std::sqrt(Ff));
             const float max = interpolate(NUMBERS_AMOUNT, NUMBERS_AMOUNT / NUMBER_BITS, Ff);
             const unsigned int retries = interpolate(min, max, 1.0f - std::sqrt(std::sqrt(1.0f - Fs)));
             return triedNumbers.size() < retries;
-
-            /* std::cout << "\tFF: " << Ff << " , " << Fs << " . " << retries << std::endl; */
             /* return (triedNumbers.size() < ALLOWED_RETRIES); */
         }
 
@@ -832,29 +813,16 @@ public:
             }
         });
 
-        /* static const auto func = [](float f) -> float { */
-        /*     return 100.0f * (1.0f - f); */
-        /* }; */
-
         const float Ff = calculateFf(funcs);
-        long long triesCounter = 0LL;
+        unsigned int stepsDone = 0LL;
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
             LOG(std::cout << ">> Got next strategy: " << location << "." << std::endl;)
 
             std::optional<Step> stepOpt = {Step(location)};
             do {
+                stepsDone++;
                 const float Fs = calculateFs(snapshot);
-                triesCounter++;
-                /* if (triesCounter++ > func(Ff) * getAverageTries()) { */
-                /*     std::cout << "dropped with " << triesCounter << std::endl; */
-                /*     if (++subsequentDrops > allowedSubsequentDropsCount) { */
-                /*         return false; */
-                /*     } */
-                /*     stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise */
-                /*     return true; */
-                /* } */
-
                 Step& step = *stepOpt;
                 const std::optional<Number> numberOpt = step.getUntriedNumber(Ff, Fs);
 
@@ -912,14 +880,10 @@ public:
 
         LOG(std::cout << snapshot.funcs;)
 
-        subsequentDrops = 0;
-        lastTries[lastTryIndex++] = triesCounter;
-        if (lastTryIndex >= lastTriesCount) lastTryIndex = 0;
-
         static auto co = 0;
         std::cout << "New x(" << ++co << ")"
             << " Ff={" << calculateFf(snapshot.funcs) << "}"
-            << " Steps=[" << triesCounter << "]"
+            << " Steps=[" << stepsDone << "]"
             << std::endl;
 
         return true;
@@ -1151,7 +1115,6 @@ public:
                 // Set X (just set, never poke)
                 actions.emplace_back(Location(LocationType::X, Coord1(xIndex)), number);
                 (actions.end() - 1)->apply(snapshot);
-                /* if (!canContinue(snapshot)) return false; */
             } else if (snapshot.xs[xIndex] != number) return false;
 
             // Secondary In
@@ -1346,7 +1309,6 @@ int main() {
     const Vector y = generateRandomVector();
     const auto xs = mb.work(y);
     fillRemainingRandom(mb.funcs);
-
 
     if (DO_CHECK) {
         std::cout << std::endl << "Checking all possible Xs..." << std::endl;
