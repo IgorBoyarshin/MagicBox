@@ -21,8 +21,8 @@ static const bool DO_LOG = false;
 
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 8;
-static const unsigned int NUMBER_BITS = 14;
+static const unsigned int NUMBERS_IN_VECTOR = 14;
+static const unsigned int NUMBER_BITS = 18;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -614,18 +614,15 @@ struct Step {
 
         Location baseLocation;
         std::vector<Action> actions;
-        bool triedNumbers[NUMBERS_AMOUNT];
-        unsigned int triedNumbersAmount;
+        std::set<unsigned int> triedNumbers;
 
     public:
         Step(const Location& location)
-            : baseLocation(location), triedNumbersAmount(0) {
-            memset(triedNumbers, false, NUMBERS_AMOUNT * sizeof(bool));
+            : baseLocation(location) {
         }
 
         void useNumber(const Number& number) {
-            if (!triedNumbers[number()]) triedNumbersAmount++;
-            triedNumbers[number()] = true;
+            triedNumbers.insert(number());
         }
 
         void applyActions(const std::vector<Action>& newActions) {
@@ -666,7 +663,7 @@ struct Step {
             const float min = interpolate(NUMBERS_AMOUNT / NUMBER_BITS, NUMBER_BITS, std::sqrt(Ff));
             const float max = interpolate(NUMBERS_AMOUNT / 2, NUMBERS_AMOUNT / NUMBER_BITS, Ff);
             const unsigned int retries = interpolate(min, max, 1.0f - std::sqrt(std::sqrt(1.0f - Fs)));
-            return (triedNumbersAmount < retries);
+            return triedNumbers.size() < retries;
 
             /* std::cout << "\tFF: " << Ff << " , " << Fs << " . " << retries << std::endl; */
             /* return (triedNumbersAmount < ALLOWED_RETRIES); */
@@ -675,18 +672,24 @@ struct Step {
         std::optional<Number> getUntriedNumber(float Ff, float Fs) const {
             if (!belowLimit(Ff, Fs)) return std::nullopt;
 
-            std::vector<Number> untriedNumbers;
-            for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
-                if (!triedNumbers[i]) untriedNumbers.emplace_back(i);
+            const unsigned int untriedCount = NUMBERS_AMOUNT - triedNumbers.size();
+            const unsigned int index = generateRandomUniformInt(0U, untriedCount - 1);
+            for (unsigned int i = 0, count = 0; i < NUMBERS_AMOUNT; i++) {
+                if (count == index) {
+                    return { Number(i) };
+                }
+                if (triedNumbers.find(i) == triedNumbers.end()) {
+                    count++;
+                }
             }
-            return { untriedNumbers[generateRandomUniformInt(0U, static_cast<unsigned int>(untriedNumbers.size() - 1))] };
+            return std::nullopt;
         }
 
         friend std::ostream& operator<<(std::ostream& stream, const Step& step);
 };
 
 std::ostream& operator<<(std::ostream& stream, const Step& step) {
-    stream << "Step(" << step.baseLocation << "," << step.actions << "," << step.triedNumbersAmount << ")";
+    stream << "Step(" << step.baseLocation << "," << step.actions << "," << step.triedNumbers.size() << ")";
 
     return stream;
 }
