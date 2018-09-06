@@ -945,6 +945,7 @@ public:
 
 
     // returns std::nullopt if a conflict arose
+    // Undoes all actions that it caused in case of a conflict
     std::optional<std::vector<Action>> poke(Snapshot& snapshot, const Location& location, const Number& number) {
         std::vector<Action> actions;
         actions.emplace_back(location, number); // self
