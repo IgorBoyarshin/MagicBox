@@ -608,7 +608,7 @@ struct Step {
             actions.insert(actions.end(), newActions.begin(), newActions.end());
         }
 
-        void fail(Snapshot& snapshot) {
+        void revert(Snapshot& snapshot) {
             for (Action& action : actions) {
                 action.undo(snapshot);
             }
@@ -665,7 +665,7 @@ class Stack {
 
         void undoAll(Snapshot& snapshot) {
             while (auto stepOpt = pop()) {
-                stepOpt->fail(snapshot);
+                stepOpt->revert(snapshot);
             }
         }
 
@@ -854,7 +854,7 @@ public:
                             std::cout << ":> Finished because the stack has depleted." << std::endl;
                             return false; // failed to construct Vector<X>
                         }
-                        stepOpt->fail(snapshot); // child failed => parent failed. Empty parent's Actions
+                        stepOpt->revert(snapshot); // child failed => parent failed. Empty parent's Actions
                         strategy.revert();
                     }
                 }
