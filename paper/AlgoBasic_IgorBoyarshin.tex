@@ -1,0 +1,83 @@
+\documentclass[12pt]{article}
+%\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage[a4paper, margin=1in]{geometry}
+\usepackage{algpseudocode}
+%\usepackage{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage[english, russian]{babel}
+\usepackage[T1, T2A]{fontenc}
+
+
+%\title{Getting started}
+%\author{Veloci Raptor}
+%\date{03/14/15}
+
+\begin{document}
+%\maketitle
+
+В даній статті прийняті такі умовні позначення:
+\begin{enumerate}
+\item $n$ -- довжина вектора;
+\item $k$ -- розрядність фрагмента;
+\item $m = \frac{n}{k}$ -- кількість фрагментів;
+\item $X = \{x_1, x_2, \dotsc , x_n\}$ -- вхідний вектор, $\forall i=1,2 \ldots n : x_i \in \{0,1\}$;
+\item $Y = \{y_1, y_2, \dotsc , y_n\}$ -- вихідний вектор, $\forall i=1,2 \ldots n : y_i \in \{0,1\}$;
+\end{enumerate}
+
+Будь-який функціональний перетворювач (ФП) можна представити у вигляді таблиці з $2^k$ рядків. У початковому стані всі комірки заповнені значенням $-1$: $\forall i=1,2 \ldots 2m-1, j=0,1 \ldots 2^k-1 : f_i(j) = -1$.
+
+Позначимо через $v_{i,j}$ вхідне значення до ФП i-го шару j-ї позиції, а через $w_{i,j}$ -- вихідне значення з ФП i-го шару j-ї позиції: $f_j(v_{i,j}) = w_{i,j}$.
+
+Вихідний вектор Y вважаємо заданим.
+
+\vspace{2em}
+
+%Покласти $i=m-1$.
+
+%Для всіх ФП$_j, j=1,2 \ldots 2m-1$, вибрати таке $v_{i,j}$, щоб $f_j(v_{i,j})=-1$. Якщо всі $v_{i,j}$ вибрати не вдалося $=>$ \textbf{conflict}.
+Для всіх ФП$_j, j=1,2 \ldots 2m-1$, вибрати таке $v_{m-1,j}$, щоб $f_j(v_{m-1,j})=-1$. Якщо всі $v_{m-1,j}$ вибрати не вдалося $=>$ \textbf{conflict}.
+
+\begin{algorithmic}
+\For{$i=m-2,m-3 \ldots 1$}
+	\State Довільним чином вибрати $v_{i,1}$, так щоб $f_1(v_{i,1}) \neq -1 $;
+	\State якщо такого $v_{i,1}$ немає, то вибрати його і $w_{i,1}$ довільним чином
+	\State і покласти $f_1(v_{i,1}) = w_{i,1}$.
+	\For{$j=2,3 \ldots 2m-i $}
+		\State $w_{i,j} = w_{i,j-1} \oplus v_{i+1,j-1}$
+		\If{$i=1$ та $j>m$}
+			\State Покласти $v_{i,j} = v_{i,j-m}$; якщо при цьому
+			\State $f_j(v_{i,j}) \neq -1$ та $f_j(v_{i,j}) \neq w_{i,j}$ $=>$ \textbf{conflict},
+			\State інакше покласти $f_j(v_{i,j}) = w_{i,j}$.
+		\Else
+			\State $v_{i,j}$ вибрати так, щоб $f_j(v_{i,j}) = w_{i,j}$; якщо такого немає,
+			\State то вибрати його випадковим чином, щоб $f_j(v_{i,j}) = -1$,
+			\State і покласти $f_j(v_{i,j}) = w_{i,j}$; якщо такого немає $=>$ \textbf{conflict}
+		\EndIf
+	\EndFor
+\EndFor
+
+\For{$j=1,2 \ldots 2m-1$}
+	\State $x_j = v_{1,j}$
+\EndFor
+
+Вибрати $w_{m-1,1}$ довільним чином і покласти $f_1(v_{m-1,1}) = w_{m-1,1}$.
+
+\For{$j=2,3 \ldots m$}
+	\State $w_{m-1,j} = (x_j \oplus y_j) \oplus w_{m-1,j-1}$.
+\EndFor
+\end{algorithmic}
+
+\vspace{2em}
+
+Як результат роботи одного такого проходу, маємо сформований новий вектор $X$ та додатково заповнені ФП системи.
+
+\end{document}
+
+input\slash output
+
+Not like this ... but like this:\\
+New York, Tokyo, Budapest, \ldots
+$\oplus$
+
+Author Name \hfill \today

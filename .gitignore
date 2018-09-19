@@ -2,3 +2,8 @@
 *.out
 dump.txt
 main
+
+*.aux
+*.log
+*.pdf
+*.synctex.gz
