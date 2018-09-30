@@ -23,8 +23,8 @@ static const bool DO_LOG = false;
 
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 14;
-static const unsigned int NUMBER_BITS = 18;
+static const unsigned int NUMBERS_IN_VECTOR = 10;
+static const unsigned int NUMBER_BITS = 10;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -722,9 +722,10 @@ public:
     Functions funcs;
 
     MagicBox() {
-        for (unsigned int i = 0; i < lastTriesCount; i++) {
-            lastTries[i] = 0;
-        }
+        for (unsigned int i = 0; i < prevStepsDone.size(); i++) prevStepsDone[i] = 0;
+        /* for (unsigned int i = 0; i < lastTriesCount; i++) { */
+        /*     lastTries[i] = 0; */
+        /* } */
     }
 
 private:
@@ -734,13 +735,15 @@ private:
 
     const unsigned int allowedSubsequentDropsCount = 4;
     unsigned int subsequentDrops = 0;
-    static const unsigned int lastTriesCount = NUMBER_BITS;
-    unsigned int lastTryIndex = 0;
-    long long lastTries[lastTriesCount];
+    bool lastWasDropped = false;
+    std::array<unsigned int, 3> prevStepsDone;
+    /* static const unsigned int lastTriesCount = NUMBER_BITS; */
+    /* unsigned int lastTryIndex = 0; */
+    /* long long lastTries[lastTriesCount]; */
 
-    float getAverageTries() {
-        return avg(lastTries, lastTriesCount);
-    }
+    /* float getAverageTries() { */
+    /*     return avg(lastTries, lastTriesCount); */
+    /* } */
 
     float calculateFf(const Functions& funcs) const {
         unsigned int fill = 0;
@@ -814,7 +817,16 @@ public:
         });
 
         const float Ff = calculateFf(funcs);
-        unsigned int stepsDone = 0LL;
+        unsigned int stepsDone = 0;
+        const unsigned int prevStepsAvg = [](const decltype(prevStepsDone)& prevStepsDone){
+            unsigned int avg = 0;
+            for (unsigned int i = 0; i < prevStepsDone.size(); i++) {
+                if (prevStepsDone[i] != 0) {
+                    avg += prevStepsDone[i];
+                }
+            }
+            return avg / prevStepsDone.size();
+        }(prevStepsDone);
         while (const auto locationOpt = strategy.getNext(snapshot, funcs)) {
             const Location location = *locationOpt;
             LOG(std::cout << ">> Got next strategy: " << location << "." << std::endl;)
@@ -822,6 +834,25 @@ public:
             std::optional<Step> stepOpt = {Step(location)};
             do {
                 stepsDone++;
+                if (stepsDone > 5 * prevStepsAvg && prevStepsAvg > 0) {
+                    if (lastWasDropped) {
+                        subsequentDrops++;
+                    } else {
+                        lastWasDropped = true;
+                        subsequentDrops = 1;
+                    }
+                    std::cout << ":> Timed out(" << stepsDone << "). Dropping("
+                        << subsequentDrops << ")" << std::endl;
+
+                    if (subsequentDrops > allowedSubsequentDropsCount) {
+                        std::cout << "Too subsequent many drops. Terminating" << std::endl;
+                        return false;
+                    } else {
+                        stepsStack.undoAll(snapshot); // there would remain useless leftovers in funcs otherwise
+                        return true;
+                    }
+                }
+
                 const float Fs = calculateFs(snapshot);
                 Step& step = *stepOpt;
                 const std::optional<Number> numberOpt = step.getUntriedNumber(Ff, Fs);
@@ -863,12 +894,16 @@ public:
             // Location (or finish, if nothing more is to be done).
         }
 
+        for (unsigned int i = 0; i < prevStepsDone.size() - 1; i++) prevStepsDone[i+1] = prevStepsDone[i];
+        prevStepsDone[0] = stepsDone;
+
         // Everything is swell, extract the Xs from snapshot
         assert(full(snapshot) && "  Snapshot not full?!");
         if (!unique(snapshot.xs, xs)) {
-            static auto duplicatesCounter = 0;
+            static unsigned int duplicatesCounter = 0;
             std::cout << ":> Duplicate generated (" << ++duplicatesCounter << "). Skipping." <<  std::endl;
-            if (duplicatesCounter > 20) {
+            static const unsigned int duplicatesLimit = 20;
+            if (duplicatesCounter > duplicatesLimit) {
                 std::cout << ":> Finished because duplicates limit has beed exceeded." << std::endl;
                 return false;
             } else {
@@ -886,6 +921,7 @@ public:
             << " Steps=[" << stepsDone << "]"
             << std::endl;
 
+        lastWasDropped = false;
         return true;
     }
 
