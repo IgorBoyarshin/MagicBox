@@ -2,7 +2,9 @@
 
 make
 
-./main
+# ./main
+./basic
 
 rm -f *.o
+rm -f basic
 rm -f main

@@ -13,6 +13,7 @@
 #include <cstring>
 #include <cmath>
 #include <iomanip>
+#include <algorithm>
 
 
 // 16-16: Ff=0.5 [4075] in 2:03
@@ -23,8 +24,8 @@ static const bool DO_LOG = false;
 
 static const bool DO_CHECK = false;
 // ----------------------------------------------------------------------------
-static const unsigned int NUMBERS_IN_VECTOR = 10;
-static const unsigned int NUMBER_BITS = 10;
+static const unsigned int NUMBERS_IN_VECTOR = 8;
+static const unsigned int NUMBER_BITS = 9;
 
 static const unsigned int NUMBERS_AMOUNT = (1 << NUMBER_BITS);
 static const unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -53,7 +54,8 @@ std::ostream& operator<<(std::ostream& stream, const Number& number) {
     return stream;
 }
 
-typedef std::array<Number, NUMBERS_IN_VECTOR> Vector;
+/* typedef std::array<Number, NUMBERS_IN_VECTOR> Vector; */
+using Vector = std::array<Number, NUMBERS_IN_VECTOR>;
 
 bool full(const Vector& vector) {
     for (const Number& number : vector) {
@@ -166,6 +168,8 @@ struct Func {
         // num_in -> num_out
         Number* map;
 
+        std::vector<Number> usedCells;
+
     public:
         Func() {
             map = new Number[SIZE];
@@ -186,6 +190,20 @@ struct Func {
 
         void update(const Number& arg, const Number& value) {
             map[arg()] = value;
+
+            if (value.empty()) {
+                if (const auto it = std::find(usedCells.begin(), usedCells.end(), arg());
+                        it != usedCells.end()) {
+                    usedCells.erase(it);
+                }
+            } else {
+                usedCells.emplace_back(arg());
+            }
+        }
+
+        std::optional<Number> getRandomUsed() const {
+            if (usedCells.empty()) return std::nullopt;
+            return { usedCells[generateRandomUniformInt(0, usedCells.size() - 1)] };
         }
 
         const Number& at(const Number& arg) const {
@@ -197,7 +215,8 @@ struct Func {
         }
 };
 
-typedef std::array<Func, FUNCS_AMOUNT> Functions;
+/* typedef std::array<Func, FUNCS_AMOUNT> Functions; */
+using Functions = std::array<Func, FUNCS_AMOUNT>;
 
 std::ostream& operator<<(std::ostream& stream, const Functions& funcs) {
     stream << "Funcs:" << std::endl;
@@ -627,8 +646,20 @@ struct Step {
             /* return (triedNumbers.size() < ALLOWED_RETRIES); */
         }
 
-        std::optional<Number> getUntriedNumber(float Ff, float Fs) const {
+        std::optional<Number> getUntriedNumber(float Ff, float Fs, const Functions& funcs) const {
             if (!belowLimit(Ff, Fs)) return std::nullopt;
+
+            /* if (baseLocation.type == LocationType::Block) { */
+            /*     assert(std::holds_alternative<Coord3>(baseLocation.coord)); */
+            /*     const unsigned int funcIndex = std::get<Coord3>(baseLocation.coord).y; */
+            /*     if (generateRandomUniformInt(0,10) < 8) { */
+            /*         const auto numberOpt = funcs[funcIndex].getRandomUsed(); */
+            /*         if (numberOpt && (triedNumbers.find((*numberOpt)()) == triedNumbers.end())) { */
+            /*             #<{(| std::cout << "Reusing" << std::endl; |)}># */
+            /*             return numberOpt; */
+            /*         } */
+            /*     } */
+            /* } */
 
             const unsigned int untriedCount = NUMBERS_AMOUNT - triedNumbers.size();
             const unsigned int index = generateRandomUniformInt(0U, untriedCount - 1);
@@ -689,7 +720,8 @@ class Stack {
         }
 };
 // ----------------------------------------------------------------------------
-typedef std::function<std::optional<Location>(unsigned int index, const Snapshot& snapshot, const Functions& funcs)> StrategyFunction;
+/* typedef std::function<std::optional<Location>(unsigned int index, const Snapshot& snapshot, const Functions& funcs)> StrategyFunction; */
+using StrategyFunction = std::function<std::optional<Location>(unsigned int index, const Snapshot& snapshot, const Functions& funcs)>;
 
 class Strategy {
     private:
@@ -805,8 +837,8 @@ public:
                     const Coord2& blockCoord = *emptyBlock;
                     return {{LocationType::Block,
                              Coord3(
-                                    blockCoord.x,
-                                    blockCoord.y,
+                                    blockCoord.x, // row
+                                    blockCoord.y, // column
                                     snapshot.blocks[blockCoord.x][blockCoord.y].emptyIn()
                                         ? BlockCell::IN
                                         : BlockCell::OUT)}};
@@ -855,7 +887,7 @@ public:
 
                 const float Fs = calculateFs(snapshot);
                 Step& step = *stepOpt;
-                const std::optional<Number> numberOpt = step.getUntriedNumber(Ff, Fs);
+                const std::optional<Number> numberOpt = step.getUntriedNumber(Ff, Fs, funcs);
 
                 {
                     LOG(std::cout << ">> Inside " << (*stepOpt) << std::endl;)

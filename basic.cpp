@@ -5,8 +5,8 @@
 #include <cassert>
 
 
-constexpr unsigned int K = 10; // bitness of fragment. Value = 0..2^k
-constexpr unsigned int M = 10; // amount of fragments (Y)
+constexpr unsigned int K = 17; // bitness of fragment. Value = 0..2^k
+constexpr unsigned int M = 6; // amount of fragments (Y)
 constexpr unsigned int NUMBERS_AMOUNT = 1 << K;
 constexpr unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 constexpr unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
@@ -50,8 +50,27 @@ bool operator==(const VectorX& v1, const VectorX& v2) {
     return true;
 };
 
+bool unique(const VectorX& x, const std::vector<VectorX>& vs) {
+    for (const VectorX& v : vs) {
+        if (x == v) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool operator!=(const VectorX& v1, const VectorX& v2) {
     return !(operator==(v1, v2));
+}
+
+VectorY yFromX(const VectorX& x) {
+    VectorY y;
+    for (unsigned int i = 0; i < YS_AMOUNT; i++) {
+        y[i] = x[i];
+    }
+
+    return y;
 }
 
 std::ostream& operator<<(std::ostream& stream, const VectorX& vector) {
@@ -113,14 +132,20 @@ struct Func {
     public:
         static constexpr unsigned int SIZE = NUMBERS_AMOUNT;
     private:
-        std::array<Number, NUMBERS_AMOUNT> map;
+        // std::array<Number, NUMBERS_AMOUNT> map;
+        Number* map;
         unsigned int emptyAmount;
 
     public:
         Func() : emptyAmount(SIZE) {
-            for (unsigned int i = 0; i < map.size(); i++) {
+            map = new Number[NUMBERS_AMOUNT];
+            for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
                 map[i] = Number(EMPTY_NUMBER);
             }
+        }
+
+        ~Func() {
+            delete[] map;
         }
 
         void set(const Number& arg, const Number& value) {
@@ -152,6 +177,29 @@ std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) {
     }
 
     return stream;
+}
+
+VectorY forward(const Funcs& funcs, const VectorX& startX) {
+    VectorX x = startX;
+    std::cout << x << " -> ";
+
+    unsigned int width = XS_AMOUNT;
+    for (unsigned int i = 0; i < M - 1; i++) {
+        for (unsigned int j = 0; j < width; j++) {
+            x[j] = funcs[j]->at(x[j]);
+        }
+        for (unsigned int j = 0; j < width - 1; j++) {
+            x[j] = XOR(x[j], x[j+1]);
+        }
+        width--;
+    }
+    for (unsigned int j = 0; j < M; j++) {
+        x[j] = XOR(x[j], startX[j]);
+    }
+
+    const VectorY y = yFromX(x);
+    std::cout << y << std::endl;
+    return y;
 }
 // ----------------------------------------------------------------------------
 
@@ -216,8 +264,9 @@ int main() {
             Number(EMPTY_NUMBER) :
             Number(indices[generateRandomUniformInt(0, indices.size() - 1)]);
     };
+    unsigned int duplicatedCount = 0;
     do {
-        std::cout << "Funcs sufficient " << xs.size() << std::endl;
+        std::cout << "Funcs sufficient ";// << xs.size() << std::endl;
 
         // Step 2
         unsigned int i = M - 1; // 1-based indexing
@@ -276,12 +325,22 @@ int main() {
         }
 
         // Step 11 is integrated into Func logic
-        xs.push_back(x);
+        if (unique(x, xs)) {
+            xs.push_back(x);
+            std::cout << "--- New X generated (" << xs.size() << ") ---" << std::endl;
+        } else {
+            std::cout << "--------- Duplicate found ----------" << std::endl;
+            duplicatedCount++;
+        }
     } while (allFuncsSufficient(funcs)); // Step 12
 
     std::cout << ":> Done. Funcs insufficient!" << std::endl;
     std::cout << "Generated " << xs.size() << " vectors" << std::endl;
+    std::cout << duplicatedCount << " duplicates discarded" << std::endl;
 
+    /* for (const VectorX& x : xs) { */
+    /*     forward(funcs, x); */
+    /* } */
 
     std::cout << std::endl << "---------------------END-----------------------" << std::endl;
     return 0;

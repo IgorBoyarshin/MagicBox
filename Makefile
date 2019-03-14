@@ -1,5 +1,5 @@
 # The name of the main file and executable
-mainFileName = main
+mainFileName = basic
 # Files that have .h and .cpp versions
 classFiles =
 # Files that only have the .h version
@@ -30,7 +30,7 @@ $(mainFileName): $(filesObj)
 
 # Utils
 clean:
-	rm -f *.o $(mainFileName)
+	rm -f *.o *.gch .*.gch $(mainFileName)
 
 cleanExe:
 	rm -f $(mainFileName)
