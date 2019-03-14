@@ -3,80 +3,71 @@
 #include <array>
 #include <cstdlib>
 #include <cassert>
+#include <algorithm>
 
 
-constexpr unsigned int K = 17; // bitness of fragment. Value = 0..2^k
-constexpr unsigned int M = 6; // amount of fragments (Y)
-constexpr unsigned int NUMBERS_AMOUNT = 1 << K;
-constexpr unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
-constexpr unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
-constexpr unsigned int YS_AMOUNT = M;
-constexpr unsigned int XS_AMOUNT = 2 * M - 1;
-constexpr unsigned int FUNCS_AMOUNT = XS_AMOUNT;
+constexpr static unsigned int K = 6; // bitness of fragment. Value = 0..2^k
+constexpr static unsigned int M = 6; // amount of fragments (Y)
+constexpr static unsigned int NUMBERS_AMOUNT = 1 << K;
+constexpr static unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
+constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
+constexpr static unsigned int YS_AMOUNT = M;
+constexpr static unsigned int XS_AMOUNT = 2 * M - 1;
+constexpr static unsigned int FUNCS_AMOUNT = XS_AMOUNT;
 
 
 // ----------------------------------------------------------------------------
 struct Number {
     unsigned int value;
 
-    Number() noexcept : value(EMPTY_NUMBER) {}
-    Number(unsigned int value) noexcept : value(value) {}
+    constexpr explicit Number()                   noexcept : value(EMPTY_NUMBER) {}
+    constexpr explicit Number(unsigned int value) noexcept : value(value) {}
 
-    inline bool empty() const noexcept { return value == EMPTY_NUMBER; };
-    inline unsigned int operator()() const noexcept { return value; }
-    inline bool operator==(const Number& other) const noexcept { return value == other(); };
-    inline bool operator!=(const Number& other) const noexcept { return value != other(); };
+    constexpr bool         empty()                         const noexcept { return value == EMPTY_NUMBER; };
+    constexpr unsigned int operator()()                    const noexcept { return value; }
+    constexpr bool         operator==(const Number& other) const noexcept { return value == other(); };
+    constexpr bool         operator!=(const Number& other) const noexcept { return value != other(); };
 };
 
-inline Number XOR(const Number& a, const Number& b) {
-    return a() ^ b();
+constexpr Number XOR(const Number& a, const Number& b) noexcept {
+    return Number(a() ^ b());
 }
 
-std::ostream& operator<<(std::ostream& stream, const Number& number) {
+std::ostream& operator<<(std::ostream& stream, const Number& number) noexcept {
     if (number.empty()) stream << "*"; else stream << number();
     return stream;
 }
 // ----------------------------------------------------------------------------
-using VectorX = std::array<Number, XS_AMOUNT>;
-using VectorY = std::array<Number, YS_AMOUNT>;
+using ArrayX = std::array<Number, XS_AMOUNT>;
+using ArrayY = std::array<Number, YS_AMOUNT>;
 
-bool operator==(const VectorX& v1, const VectorX& v2) {
+constexpr bool operator==(const ArrayX& v1, const ArrayX& v2) noexcept {
     for (unsigned int i = 0; i < XS_AMOUNT; i++) {
-        if (v1[i] != v2[i]) {
-            return false;
-        }
+        if (v1[i] != v2[i]) return false;
     }
-
     return true;
 };
 
-bool unique(const VectorX& x, const std::vector<VectorX>& vs) {
-    for (const VectorX& v : vs) {
-        if (x == v) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-bool operator!=(const VectorX& v1, const VectorX& v2) {
+constexpr bool operator!=(const ArrayX& v1, const ArrayX& v2) noexcept {
     return !(operator==(v1, v2));
 }
 
-VectorY yFromX(const VectorX& x) {
-    VectorY y;
-    for (unsigned int i = 0; i < YS_AMOUNT; i++) {
-        y[i] = x[i];
+template <typename T>
+constexpr bool unique(const T& x, const std::vector<T>& vs) noexcept {
+    for (const T& v : vs) {
+        if (x == v) return false;
     }
+    return true;
+}
 
+constexpr ArrayY yFromX(const ArrayX& x) noexcept {
+    ArrayY y;
+    for (unsigned int i = 0; i < YS_AMOUNT; i++) y[i] = x[i];
     return y;
 }
 
-std::ostream& operator<<(std::ostream& stream, const VectorX& vector) {
-    if (vector.size() == 0) {
-        return stream;
-    }
+std::ostream& operator<<(std::ostream& stream, const ArrayX& vector) noexcept {
+    if (vector.size() == 0) return stream;
 
     stream << "{";
     for (unsigned int i = 0; i < vector.size() - 1; i++) {
@@ -87,10 +78,8 @@ std::ostream& operator<<(std::ostream& stream, const VectorX& vector) {
 
     return stream;
 }
-std::ostream& operator<<(std::ostream& stream, const VectorY& vector) {
-    if (vector.size() == 0) {
-        return stream;
-    }
+std::ostream& operator<<(std::ostream& stream, const ArrayY& vector) noexcept {
+    if (vector.size() == 0) return stream;
 
     stream << "{";
     for (unsigned int i = 0; i < vector.size() - 1; i++) {
@@ -102,29 +91,23 @@ std::ostream& operator<<(std::ostream& stream, const VectorY& vector) {
     return stream;
 }
 // ----------------------------------------------------------------------------
-unsigned int generateRandomUniformInt(unsigned int low, unsigned int high) {
+unsigned int generateRandomUniformInt(unsigned int low, unsigned int high) noexcept {
     const auto range = high - low + 1;
-    return rand() % range + low;
+    return std::rand() % range + low;
 }
 
-Number generateRandomNumber() {
-    return generateRandomUniformInt(0U, NUMBER_MAX);
+Number generateRandomNumber() noexcept {
+    return Number(generateRandomUniformInt(0U, NUMBER_MAX));
 }
 
-VectorX generateRandomVectorX() {
-    VectorX vector;
-    for (Number& number : vector) {
-        number = generateRandomNumber();
-    }
-
+ArrayX generateRandomVectorX() noexcept {
+    ArrayX vector;
+    for (Number& number : vector) number = generateRandomNumber();
     return vector;
 }
-VectorY generateRandomVectorY() {
-    VectorY vector;
-    for (Number& number : vector) {
-        number = generateRandomNumber();
-    }
-
+ArrayY generateRandomArrayY() noexcept {
+    ArrayY vector;
+    for (Number& number : vector) number = generateRandomNumber();
     return vector;
 }
 // ----------------------------------------------------------------------------
@@ -132,13 +115,13 @@ struct Func {
     public:
         static constexpr unsigned int SIZE = NUMBERS_AMOUNT;
     private:
+        // std::array<> doesn't work on large numbers because initializes on stack
         // std::array<Number, NUMBERS_AMOUNT> map;
         Number* map;
         unsigned int emptyAmount;
 
     public:
-        Func() : emptyAmount(SIZE) {
-            map = new Number[NUMBERS_AMOUNT];
+        Func() : map(new Number[NUMBERS_AMOUNT]), emptyAmount(SIZE) {
             for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
                 map[i] = Number(EMPTY_NUMBER);
             }
@@ -148,26 +131,31 @@ struct Func {
             delete[] map;
         }
 
-        void set(const Number& arg, const Number& value) {
+        constexpr void set(const Number& arg, const Number& value) noexcept {
             emptyAmount += value.empty() ? 1 : -1;
             map[arg()] = value;;
         }
-        const Number& at(const Number& arg) const {
+
+        constexpr const Number& at(unsigned int arg) const noexcept {
+            return map[arg];
+        }
+
+        constexpr const Number& at(const Number& arg) const noexcept {
             return map[arg()];
         }
 
-        bool emptyAt(const Number& arg) const {
+        constexpr bool emptyAt(const Number& arg) const noexcept {
             return (map[arg()].empty());
         }
 
-        unsigned int getEmptyAmount() const {
+        constexpr unsigned int getEmptyAmount() const noexcept {
             return emptyAmount;
         }
 };
 
 using Funcs = std::array<Func*, FUNCS_AMOUNT>;
 
-std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) {
+std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) noexcept {
     stream << "Funcs:" << std::endl;
     for (unsigned int i = 0; i < Func::SIZE; i++) {
         for (const Func* func : funcs) {
@@ -179,8 +167,8 @@ std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) {
     return stream;
 }
 
-VectorY forward(const Funcs& funcs, const VectorX& startX) {
-    VectorX x = startX;
+ArrayY forward(const Funcs& funcs, const ArrayX& startX) {
+    ArrayX x = startX;
     std::cout << x << " -> ";
 
     unsigned int width = XS_AMOUNT;
@@ -197,32 +185,26 @@ VectorY forward(const Funcs& funcs, const VectorX& startX) {
         x[j] = XOR(x[j], startX[j]);
     }
 
-    const VectorY y = yFromX(x);
+    const ArrayY y = yFromX(x);
     std::cout << y << std::endl;
     return y;
 }
 // ----------------------------------------------------------------------------
-
-
 int main() {
     srand(410);
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
     Funcs funcs;
     for (unsigned int i = 0; i < funcs.size(); i++) funcs[i] = new Func();
 
-    const VectorY y = generateRandomVectorY();
+    const ArrayY y = generateRandomArrayY();
     std::cout << ":> Generated Y = " << y << std::endl;
-    std::vector<VectorX> xs;
+    std::vector<ArrayX> xs;
 
-    const auto allFuncsSufficient = [](const std::array<Func*, FUNCS_AMOUNT> funcs){
-        for (unsigned int j = 0; j < funcs.size(); j++) {
-            if (funcs[j]->getEmptyAmount() < M - 1) {
-                return false;
-            }
-        }
-        return true;
+    const auto allFuncsSufficient = [](const Funcs& funcs) {
+        return std::all_of(funcs.cbegin(), funcs.cend(),
+            [](Func* func){ return func->getEmptyAmount() < M - 1; });
     };
-    const auto pickRandomEmpty = [](const Func* func, const Number& forbiddenIndex){
+    const auto pickRandomEmpty = [](const Func* func, const Number& forbiddenIndex) {
         const unsigned int targetIndex = generateRandomUniformInt(0, func->getEmptyAmount() - 1);
         unsigned int iterator = 0;
         for (unsigned int k = 0; ; k++) {
@@ -264,7 +246,8 @@ int main() {
             Number(EMPTY_NUMBER) :
             Number(indices[generateRandomUniformInt(0, indices.size() - 1)]);
     };
-    unsigned int duplicatedCount = 0;
+
+    unsigned int duplicatesCount = 0;
     do {
         std::cout << "Funcs sufficient ";// << xs.size() << std::endl;
 
@@ -274,7 +257,7 @@ int main() {
         // Step 3
         std::array<Number, M+1> v_last; // input into last row
         for (unsigned int j = 0; j < v_last.size(); j++) {
-            v_last[j] = pickRandomEmpty(funcs[j], EMPTY_NUMBER);
+            v_last[j] = pickRandomEmpty(funcs[j], Number(EMPTY_NUMBER));
             assert(!v_last[j].empty() && "No empty elements in the last row");
         }
 
@@ -311,7 +294,7 @@ int main() {
         } // Step 7
 
         // Step 8
-        VectorX x;
+        ArrayX x;
         for (unsigned int j = 0; j < XS_AMOUNT; j++) x[j] = old_v[j]; // old_v === new_v now
 
         // Step 9
@@ -330,15 +313,15 @@ int main() {
             std::cout << "--- New X generated (" << xs.size() << ") ---" << std::endl;
         } else {
             std::cout << "--------- Duplicate found ----------" << std::endl;
-            duplicatedCount++;
+            duplicatesCount++;
         }
     } while (allFuncsSufficient(funcs)); // Step 12
 
     std::cout << ":> Done. Funcs insufficient!" << std::endl;
     std::cout << "Generated " << xs.size() << " vectors" << std::endl;
-    std::cout << duplicatedCount << " duplicates discarded" << std::endl;
+    std::cout << duplicatesCount << " duplicates discarded" << std::endl;
 
-    /* for (const VectorX& x : xs) { */
+    /* for (const ArrayX& x : xs) { */
     /*     forward(funcs, x); */
     /* } */
 

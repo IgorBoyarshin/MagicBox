@@ -30,7 +30,7 @@ $(mainFileName): $(filesObj)
 
 # Utils
 clean:
-	rm -f *.o *.gch .*.gch $(mainFileName)
+	rm -f *.o *.gch .*.gch $(mainFileName) a.out
 
 cleanExe:
 	rm -f $(mainFileName)
