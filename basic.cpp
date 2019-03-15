@@ -91,6 +91,7 @@ std::ostream& operator<<(std::ostream& stream, const ArrayY& vector) noexcept {
     return stream;
 }
 // ----------------------------------------------------------------------------
+// Range: [low; high]
 unsigned int generateRandomUniformInt(unsigned int low, unsigned int high) noexcept {
     const auto range = high - low + 1;
     return std::rand() % range + low;
@@ -132,8 +133,10 @@ struct Func {
         }
 
         constexpr void set(const Number& arg, const Number& value) noexcept {
-            emptyAmount += value.empty() ? 1 : -1;
-            map[arg()] = value;;
+            if (map[arg()].empty() != value.empty()) {
+                emptyAmount += value.empty() ? 1 : -1;
+            }
+            map[arg()] = value;
         }
 
         constexpr const Number& at(unsigned int arg) const noexcept {
@@ -200,39 +203,27 @@ int main() {
     std::cout << ":> Generated Y = " << y << std::endl;
     std::vector<ArrayX> xs;
 
+    // Each Func must be able to provide at least additional (M - 1) empty cells
+    // for upcoming iteration
     const auto allFuncsSufficient = [](const Funcs& funcs) {
         return std::all_of(funcs.cbegin(), funcs.cend(),
-            [](Func* func){ return func->getEmptyAmount() < M - 1; });
+            [](Func* func){ return func->getEmptyAmount() >= M - 1; });
     };
-    const auto pickRandomEmpty = [](const Func* func, const Number& forbiddenIndex) {
-        const unsigned int targetIndex = generateRandomUniformInt(0, func->getEmptyAmount() - 1);
-        unsigned int iterator = 0;
-        for (unsigned int k = 0; ; k++) {
-            if (k == Func::SIZE) k = 0; // allow looping to ensure that we find targetIndex-s element
-            if (func->at(k).empty() && Number(k) != forbiddenIndex) {
-                if (iterator == targetIndex) {
-                    return Number(k);
-                } else {
-                    iterator++;
-                }
-            }
+    const auto pickRandomEmpty = [](const Func* func, const Number& forbiddenNumber) {
+        if (func->getEmptyAmount() == 0) return Number(EMPTY_NUMBER);
+        const unsigned int startingIndex = generateRandomUniformInt(0, Func::SIZE - 1);
+        for (unsigned int k = startingIndex;; k++) {
+            if (k == Func::SIZE) k = 0;
+            if (k == forbiddenNumber()) continue;
+            if (func->at(k).empty()) return Number(k);
         }
     };
     const auto pickRandomNotEmpty = [](const Func* func){
-        if (func->getEmptyAmount() == Func::SIZE) {
-            return Number(EMPTY_NUMBER);
-        }
-
-        const unsigned int targetIndex = generateRandomUniformInt(0, Func::SIZE - func->getEmptyAmount() - 1);
-        unsigned int iterator = 0;
-        for (unsigned int k = 0; ; k++) {
-            if (!func->at(k).empty()) {
-                if (iterator == targetIndex) {
-                    return Number(k);
-                } else {
-                    iterator++;
-                }
-            }
+        if (func->getEmptyAmount() == Func::SIZE) return Number(EMPTY_NUMBER);
+        const unsigned int startingIndex = generateRandomUniformInt(0, Func::SIZE - 1);
+        for (unsigned int k = startingIndex;; k++) {
+            if (k == Func::SIZE) k = 0;
+            if (!func->at(k).empty()) return Number(k);
         }
     };
     const auto pickRandomTarget = [](const Func* func, const Number& target){
@@ -262,6 +253,7 @@ int main() {
         }
 
         std::vector<Number> old_v; // i
+        old_v.reserve(v_last.size());
         for (unsigned int i = 0; i < v_last.size(); i++) old_v.push_back(v_last[i]); // initial values
         for (; i >= 2;) { // Step 4, 7
             i--; // Step 4
@@ -275,6 +267,7 @@ int main() {
 
             // Step 6
             std::vector<Number> new_v; // i-1
+            new_v.reserve(2 * M - i);
             new_v.push_back(v0);
             for (unsigned int j = 1; j <= 2*M-i-1; j++) {
                 const Number prevV = new_v[new_v.size() - 1];
