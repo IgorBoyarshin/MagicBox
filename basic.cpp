@@ -6,8 +6,8 @@
 #include <algorithm>
 
 
-constexpr static unsigned int K = 6; // bitness of fragment. Value = 0..2^k
-constexpr static unsigned int M = 6; // amount of fragments (Y)
+constexpr static unsigned int K = 15; // bitness of fragment. Value = 0..2^k
+constexpr static unsigned int M = 7; // amount of fragments (Y)
 constexpr static unsigned int NUMBERS_AMOUNT = 1 << K;
 constexpr static unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
@@ -267,7 +267,7 @@ int main() {
 
             // Step 6
             std::vector<Number> new_v; // i-1
-            new_v.reserve(2 * M - i);
+            new_v.reserve(2 * M - i - 1);
             new_v.push_back(v0);
             for (unsigned int j = 1; j <= 2*M-i-1; j++) {
                 const Number prevV = new_v[new_v.size() - 1];
