@@ -170,7 +170,7 @@ std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) noexcept {
     return stream;
 }
 
-ArrayY forward(const Funcs& funcs, const ArrayX& startX) {
+ArrayY forward(const Funcs& funcs, const ArrayX& startX) noexcept {
     ArrayX x = startX;
     std::cout << x << " -> ";
 
