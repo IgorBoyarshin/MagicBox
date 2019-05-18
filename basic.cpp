@@ -6,7 +6,7 @@
 #include <algorithm>
 
 
-constexpr static unsigned int K = 15; // bitness of fragment. Value = 0..2^k
+constexpr static unsigned int K = 10; // bitness of fragment. Value = 0..2^k
 constexpr static unsigned int M = 7; // amount of fragments (Y)
 constexpr static unsigned int NUMBERS_AMOUNT = 1 << K;
 constexpr static unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
@@ -14,14 +14,12 @@ constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
 constexpr static unsigned int YS_AMOUNT = M;
 constexpr static unsigned int XS_AMOUNT = 2 * M - 1;
 constexpr static unsigned int FUNCS_AMOUNT = XS_AMOUNT;
-
-
 // ----------------------------------------------------------------------------
 struct Number {
     unsigned int value;
 
     constexpr explicit Number()                   noexcept : value(EMPTY_NUMBER) {}
-    constexpr explicit Number(unsigned int value) noexcept : value(value) {}
+    constexpr explicit Number(unsigned int value) noexcept : value(value)        {}
 
     constexpr bool         empty()                         const noexcept { return value == EMPTY_NUMBER; };
     constexpr unsigned int operator()()                    const noexcept { return value; }
@@ -101,11 +99,6 @@ Number generateRandomNumber() noexcept {
     return Number(generateRandomUniformInt(0U, NUMBER_MAX));
 }
 
-ArrayX generateRandomVectorX() noexcept {
-    ArrayX vector;
-    for (Number& number : vector) number = generateRandomNumber();
-    return vector;
-}
 ArrayY generateRandomArrayY() noexcept {
     ArrayY vector;
     for (Number& number : vector) number = generateRandomNumber();
@@ -172,8 +165,6 @@ std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) noexcept {
 
 ArrayY forward(const Funcs& funcs, const ArrayX& startX) noexcept {
     ArrayX x = startX;
-    std::cout << x << " -> ";
-
     unsigned int width = XS_AMOUNT;
     for (unsigned int i = 0; i < M - 1; i++) {
         for (unsigned int j = 0; j < width; j++) {
@@ -188,16 +179,14 @@ ArrayY forward(const Funcs& funcs, const ArrayX& startX) noexcept {
         x[j] = XOR(x[j], startX[j]);
     }
 
-    const ArrayY y = yFromX(x);
-    std::cout << y << std::endl;
-    return y;
+    return yFromX(x);
 }
 // ----------------------------------------------------------------------------
 int main() {
     srand(410);
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
     Funcs funcs;
-    for (unsigned int i = 0; i < funcs.size(); i++) funcs[i] = new Func();
+    for (auto& func : funcs) func = new Func(); // auto <=> Func*&
 
     const ArrayY y = generateRandomArrayY();
     std::cout << ":> Generated Y = " << y << std::endl;
@@ -240,7 +229,7 @@ int main() {
 
     unsigned int duplicatesCount = 0;
     do {
-        std::cout << "Funcs sufficient ";// << xs.size() << std::endl;
+        std::cout << "Funcs sufficient ";
 
         // Step 2
         unsigned int i = M - 1; // 1-based indexing
@@ -314,9 +303,12 @@ int main() {
     std::cout << "Generated " << xs.size() << " vectors" << std::endl;
     std::cout << duplicatesCount << " duplicates discarded" << std::endl;
 
-    /* for (const ArrayX& x : xs) { */
-    /*     forward(funcs, x); */
-    /* } */
+    for (const ArrayX& x : xs) {
+        const auto result = forward(funcs, x);
+        if (result != y) {
+            std::cout << ">>> ERROR: Hash does not match!" << std::endl;
+        }
+    }
 
     std::cout << std::endl << "---------------------END-----------------------" << std::endl;
     return 0;
