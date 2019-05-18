@@ -6,8 +6,8 @@
 #include <algorithm>
 
 
-constexpr static unsigned int K = 10; // bitness of fragment. Value = 0..2^k
-constexpr static unsigned int M = 7; // amount of fragments (Y)
+constexpr static unsigned int K = 16; // bitness of fragment. Value = 0..2^k
+constexpr static unsigned int M = 5; // amount of fragments (Y)
 constexpr static unsigned int NUMBERS_AMOUNT = 1 << K;
 constexpr static unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
