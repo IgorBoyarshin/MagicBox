@@ -7,7 +7,7 @@
 
 
 constexpr static unsigned int K = 16; // bitness of fragment. Value = 0..2^k
-constexpr static unsigned int M = 5; // amount of fragments (Y)
+constexpr static unsigned int M = 7; // amount of fragments (Y)
 constexpr static unsigned int NUMBERS_AMOUNT = 1 << K;
 constexpr static unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
@@ -165,15 +165,13 @@ std::ostream& operator<<(std::ostream& stream, const Funcs& funcs) noexcept {
 
 ArrayY forward(const Funcs& funcs, const ArrayX& startX) noexcept {
     ArrayX x = startX;
-    unsigned int width = XS_AMOUNT;
-    for (unsigned int i = 0; i < M - 1; i++) {
+    for (unsigned int width = XS_AMOUNT; width > YS_AMOUNT; width--) {
         for (unsigned int j = 0; j < width; j++) {
             x[j] = funcs[j]->at(x[j]);
         }
         for (unsigned int j = 0; j < width - 1; j++) {
             x[j] = XOR(x[j], x[j+1]);
         }
-        width--;
     }
     for (unsigned int j = 0; j < M; j++) {
         x[j] = XOR(x[j], startX[j]);
