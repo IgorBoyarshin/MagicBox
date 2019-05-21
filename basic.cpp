@@ -257,7 +257,7 @@ int main() {
             new_v.reserve(2 * M - i);
             new_v.push_back(v0);
             for (unsigned int j = 1; j <= 2*M-i-1; j++) {
-                const Number prevV = new_v[new_v.size() - 1];
+                const Number prevV = new_v[j - 1];
                 const Number prevW = funcs[j - 1]->at(prevV);
                 const Number w = XOR(prevW, old_v[j - 1]);
 
