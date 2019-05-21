@@ -254,7 +254,7 @@ int main() {
 
             // Step 6
             std::vector<Number> new_v; // i-1
-            new_v.reserve(2 * M - i - 1);
+            new_v.reserve(2 * M - i);
             new_v.push_back(v0);
             for (unsigned int j = 1; j <= 2*M-i-1; j++) {
                 const Number prevV = new_v[new_v.size() - 1];
