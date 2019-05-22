@@ -15,6 +15,7 @@ constexpr static unsigned int YS_AMOUNT = M;
 constexpr static unsigned int XS_AMOUNT = 2 * M - 1;
 constexpr static unsigned int FUNCS_AMOUNT = XS_AMOUNT;
 constexpr static bool         DO_CHECK_UNIQUENESS = false;
+constexpr static bool         DO_CHECK_HASHES = false;
 constexpr static bool         VERBOSE = false;
 // ----------------------------------------------------------------------------
 struct Number {
@@ -322,9 +323,9 @@ int main() {
     std::cout << "Generated " << xs.size() << " vectors" << std::endl;
     if (DO_CHECK_UNIQUENESS) std::cout << duplicatesCount << " duplicates discarded" << std::endl;
 
-    // if (!hashesMatch(funcs, xs, y)) {
-    //     std::cout << ">>> ERROR: Hash does not match!" << std::endl;
-    // }
+    if (DO_CHECK_HASHES && !hashesMatch(funcs, xs, y)) {
+        std::cout << ">>> ERROR: Hash does not match!" << std::endl;
+    }
 
     std::cout << std::endl << "---------------------END-----------------------" << std::endl;
     return 0;
