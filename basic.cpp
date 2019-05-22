@@ -162,7 +162,7 @@ struct Func {
             return emptyAmount;
         }
 
-        constexpr const std::vector<Number>& cacheEntryFor(const unsigned int arg) const noexcept {
+        constexpr const std::vector<Number>& cacheEntryFor(unsigned int arg) const noexcept {
             return cache[arg];
         }
 };
