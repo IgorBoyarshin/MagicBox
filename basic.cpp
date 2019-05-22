@@ -112,31 +112,42 @@ struct Func {
         // std::array<> doesn't work on large numbers because initializes on stack
         // std::array<Number, NUMBERS_AMOUNT> map;
         Number* map;
+        std::vector<Number>* cache;
         unsigned int emptyAmount;
 
     public:
-        Func() : map(new Number[NUMBERS_AMOUNT]), emptyAmount(SIZE) {
-            for (unsigned int i = 0; i < NUMBERS_AMOUNT; i++) {
-                map[i] = Number(EMPTY_NUMBER);
-            }
-        }
+        Func() : map  (new Number             [NUMBERS_AMOUNT]()), // default initialization
+                 cache(new std::vector<Number>[NUMBERS_AMOUNT]()), // default initialization
+                 emptyAmount(SIZE) {}
 
         ~Func() {
             delete[] map;
+            delete[] cache;
         }
 
-        constexpr void set(const Number& arg, const Number& value) noexcept {
+        void set(const Number& arg, const Number& value) noexcept {
             if (map[arg()].empty() != value.empty()) {
                 emptyAmount += value.empty() ? 1 : -1;
             }
+
+            if (value.empty()) {
+                const auto key = map[arg()];
+                auto& items = cache[key()];
+                const auto index = std::find(items.cbegin(), items.cend(), arg);
+                items.erase(index);
+            } else {
+                const auto key = value;
+                cache[key()].push_back(arg);
+            }
+
             map[arg()] = value;
         }
 
-        constexpr const Number& at(unsigned int arg) const noexcept {
+        constexpr Number at(unsigned int arg) const noexcept {
             return map[arg];
         }
 
-        constexpr const Number& at(const Number& arg) const noexcept {
+        constexpr Number at(const Number& arg) const noexcept {
             return map[arg()];
         }
 
@@ -146,6 +157,10 @@ struct Func {
 
         constexpr unsigned int getEmptyAmount() const noexcept {
             return emptyAmount;
+        }
+
+        constexpr const std::vector<Number>& cacheEntryFor(const unsigned int arg) const noexcept {
+            return cache[arg];
         }
 };
 
@@ -214,15 +229,10 @@ int main() {
         }
     };
     const auto pickRandomTarget = [](const Func* func, const Number& target){
-        std::vector<unsigned int> indices;
-        for (unsigned int k = 0; k < Func::SIZE; k++) {
-            if (func->at(k) == target) {
-                indices.push_back(k);
-            }
-        }
-        return (indices.size() == 0) ?
+        const auto& indices = func->cacheEntryFor(target());
+        return indices.empty() ?
             Number(EMPTY_NUMBER) :
-            Number(indices[generateRandomUniformInt(0, indices.size() - 1)]);
+            indices[generateRandomUniformInt(0, indices.size() - 1)];
     };
 
     unsigned int duplicatesCount = 0;
