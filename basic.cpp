@@ -14,6 +14,7 @@ constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
 constexpr static unsigned int YS_AMOUNT = M;
 constexpr static unsigned int XS_AMOUNT = 2 * M - 1;
 constexpr static unsigned int FUNCS_AMOUNT = XS_AMOUNT;
+constexpr static bool         DO_CHECK_UNIQUENESS = false;
 // ----------------------------------------------------------------------------
 struct Number {
     unsigned int value;
@@ -298,12 +299,12 @@ int main() {
         }
 
         // Step 11 is integrated into Func logic
-        if (unique(x, xs)) {
-            xs.push_back(x);
-            std::cout << "--- New X generated (" << xs.size() << ") ---" << std::endl;
-        } else {
+        if (DO_CHECK_UNIQUENESS && !unique(x, xs)) {
             std::cout << "--------- Duplicate found ----------" << std::endl;
             duplicatesCount++;
+        } else {
+            xs.push_back(x);
+            std::cout << "--- New X generated (" << xs.size() << ") ---" << std::endl;
         }
     } while (allFuncsSufficient(funcs)); // Step 12
 
