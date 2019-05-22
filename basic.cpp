@@ -209,6 +209,7 @@ int main() {
     srand(410);
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
     std::cout << "Running for K=" << K << " and M=" << M << std::endl;
+
     Funcs funcs;
     for (auto& func : funcs) func = new Func(); // auto <=> Func*&
 
@@ -222,12 +223,12 @@ int main() {
         return std::all_of(funcs.cbegin(), funcs.cend(),
             [](Func* func){ return func->getEmptyAmount() >= M - 1; });
     };
-    const auto pickRandomEmpty = [](const Func* func, const Number& forbiddenNumber) {
+    const auto pickRandomEmpty = [](const Func* func, const Number& forbiddenIndex) {
         if (func->getEmptyAmount() == 0) return Number(EMPTY_NUMBER);
         const unsigned int startingIndex = generateRandomUniformInt(0, Func::SIZE - 1);
         for (unsigned int k = startingIndex;; k++) {
             if (k == Func::SIZE) k = 0;
-            if (k == forbiddenNumber()) continue;
+            if (k == forbiddenIndex()) continue;
             if (func->at(k).empty()) return Number(k);
         }
     };
