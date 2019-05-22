@@ -15,6 +15,7 @@ constexpr static unsigned int YS_AMOUNT = M;
 constexpr static unsigned int XS_AMOUNT = 2 * M - 1;
 constexpr static unsigned int FUNCS_AMOUNT = XS_AMOUNT;
 constexpr static bool         DO_CHECK_UNIQUENESS = false;
+constexpr static bool         VERBOSE = false;
 // ----------------------------------------------------------------------------
 struct Number {
     unsigned int value;
@@ -195,15 +196,23 @@ ArrayY forward(const Funcs& funcs, const ArrayX& startX) noexcept {
 
     return yFromX(x);
 }
+
+bool hashesMatch(const Funcs& funcs, const std::vector<ArrayX>& xs, const ArrayY& y) noexcept {
+    for (const ArrayX& x : xs) {
+        if (forward(funcs, x) != y) return false;
+    }
+    return true;
+}
 // ----------------------------------------------------------------------------
 int main() {
     srand(410);
     std::cout << "--------------------BEGIN----------------------" << std::endl << std::endl;
+    std::cout << "Running for K=" << K << " and M=" << M << std::endl;
     Funcs funcs;
     for (auto& func : funcs) func = new Func(); // auto <=> Func*&
 
     const ArrayY y = generateRandomArrayY();
-    std::cout << ":> Generated Y = " << y << std::endl;
+    if (VERBOSE) std::cout << ":> Generated Y = " << y << std::endl;
     std::vector<ArrayX> xs;
 
     // Each Func must be able to provide at least additional (M - 1) empty cells
@@ -238,7 +247,7 @@ int main() {
 
     unsigned int duplicatesCount = 0;
     do {
-        std::cout << "Funcs sufficient ";
+        if (VERBOSE) std::cout << ":> Funcs sufficient ";
 
         // Step 2
         unsigned int i = M - 1; // 1-based indexing
@@ -304,20 +313,18 @@ int main() {
             duplicatesCount++;
         } else {
             xs.push_back(x);
-            std::cout << "--- New X generated (" << xs.size() << ") ---" << std::endl;
+            std::cout << "--- New X generated (" << xs.size() << ") ---" << '\r';
         }
     } while (allFuncsSufficient(funcs)); // Step 12
 
-    std::cout << ":> Done. Funcs insufficient!" << std::endl;
+    std::cout << std::endl;
+    if (VERBOSE) std::cout << ":> Done. Funcs insufficient!" << std::endl;
     std::cout << "Generated " << xs.size() << " vectors" << std::endl;
-    std::cout << duplicatesCount << " duplicates discarded" << std::endl;
+    if (DO_CHECK_UNIQUENESS) std::cout << duplicatesCount << " duplicates discarded" << std::endl;
 
-    for (const ArrayX& x : xs) {
-        const auto result = forward(funcs, x);
-        if (result != y) {
-            std::cout << ">>> ERROR: Hash does not match!" << std::endl;
-        }
-    }
+    // if (!hashesMatch(funcs, xs, y)) {
+    //     std::cout << ">>> ERROR: Hash does not match!" << std::endl;
+    // }
 
     std::cout << std::endl << "---------------------END-----------------------" << std::endl;
     return 0;
