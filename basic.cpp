@@ -6,16 +6,16 @@
 #include <algorithm>
 
 
-constexpr static unsigned int K = 16; // bitness of fragment. Value = 0..2^k
-constexpr static unsigned int M = 7; // amount of fragments (Y)
+constexpr static unsigned int K = 18; // bitness of fragment. Value = 0..2^k
+constexpr static unsigned int M = 9; // amount of fragments (Y)
 constexpr static unsigned int NUMBERS_AMOUNT = 1 << K;
 constexpr static unsigned int NUMBER_MAX = NUMBERS_AMOUNT - 1;
 constexpr static unsigned int EMPTY_NUMBER = NUMBERS_AMOUNT;
 constexpr static unsigned int YS_AMOUNT = M;
 constexpr static unsigned int XS_AMOUNT = 2 * M - 1;
 constexpr static unsigned int FUNCS_AMOUNT = XS_AMOUNT;
-constexpr static bool         DO_CHECK_UNIQUENESS = false;
-constexpr static bool         DO_CHECK_HASHES = false;
+constexpr static bool         DO_CHECK_UNIQUENESS = false; // noticable slowdown
+constexpr static bool         DO_CHECK_HASHES = false; // little to no slowdown
 constexpr static bool         VERBOSE = false;
 // ----------------------------------------------------------------------------
 struct Number {
