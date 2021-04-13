@@ -263,7 +263,7 @@ int main() {
 
         std::vector<Number> old_v; // i
         old_v.reserve(v_last.size());
-        for (unsigned int i = 0; i < v_last.size(); i++) old_v.push_back(v_last[i]); // initial values
+        for (unsigned int j = 0; j < v_last.size(); j++) old_v.push_back(v_last[j]); // initial values
         for (; i >= 2;) { // Step 4, 7
             i--; // Step 4
             // Step 5
@@ -285,7 +285,8 @@ int main() {
 
                 Number v = pickRandomTarget(funcs[j], w);
                 if (v.empty()) { // then pick any from empty
-                    v = pickRandomEmpty(funcs[j], v_last[j]);
+                    const auto forbidden = (j < M + 1) ? v_last[j] : Number(EMPTY_NUMBER);
+                    v = pickRandomEmpty(funcs[j], forbidden);
                     assert(!v.empty() && "No empty element found");
                     funcs[j]->set(v, w);
                 }
